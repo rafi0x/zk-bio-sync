@@ -1,0 +1,240 @@
+{
+	"info": {
+		"_postman_id": "895530d5-f1a7-4508-9460-685197b2fa7c",
+		"name": "zkt-bio-apis",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "32983262"
+	},
+	"item": [
+		{
+			"name": "Login",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"username\": \"admin\",\n    \"password\": \"admin7445\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://192.168.1.100:90/jwt-api-token-auth/",
+					"protocol": "http",
+					"host": [
+						"192",
+						"168",
+						"1",
+						"100"
+					],
+					"port": "90",
+					"path": [
+						"jwt-api-token-auth",
+						""
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Get All Employee",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"auth": {
+					"type": "apikey",
+					"apikey": [
+						{
+							"key": "value",
+							"value": "JWT {{token}}",
+							"type": "string"
+						},
+						{
+							"key": "key",
+							"value": "Authorization",
+							"type": "string"
+						}
+					]
+				},
+				"method": "GET",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://192.168.1.100:90/personnel/api/employees/",
+					"protocol": "http",
+					"host": [
+						"192",
+						"168",
+						"1",
+						"100"
+					],
+					"port": "90",
+					"path": [
+						"personnel",
+						"api",
+						"employees",
+						""
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Get Devices",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"auth": {
+					"type": "apikey",
+					"apikey": [
+						{
+							"key": "value",
+							"value": "JWT {{token}}",
+							"type": "string"
+						},
+						{
+							"key": "key",
+							"value": "Authorization",
+							"type": "string"
+						}
+					]
+				},
+				"method": "GET",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://192.168.1.100:90/iclock/api/terminals/",
+					"protocol": "http",
+					"host": [
+						"192",
+						"168",
+						"1",
+						"100"
+					],
+					"port": "90",
+					"path": [
+						"iclock",
+						"api",
+						"terminals",
+						""
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Device logs",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"auth": {
+					"type": "apikey",
+					"apikey": [
+						{
+							"key": "value",
+							"value": "JWT {{token}}",
+							"type": "string"
+						},
+						{
+							"key": "key",
+							"value": "Authorization",
+							"type": "string"
+						}
+					]
+				},
+				"method": "GET",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://192.168.1.100:90/iclock/api/transactions/?emp_code=1&page_size=1000&start_time=2025-04-26&end_time=2025-04-26",
+					"protocol": "http",
+					"host": [
+						"192",
+						"168",
+						"1",
+						"100"
+					],
+					"port": "90",
+					"path": [
+						"iclock",
+						"api",
+						"transactions",
+						""
+					],
+					"query": [
+						{
+							"key": "emp_code",
+							"value": "1"
+						},
+						{
+							"key": "page_size",
+							"value": "1000"
+						},
+						{
+							"key": "start_time",
+							"value": "2025-04-26"
+						},
+						{
+							"key": "end_time",
+							"value": "2025-04-26"
+						}
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}
