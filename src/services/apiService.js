@@ -1,5 +1,5 @@
-import axios from 'axios';
-import dbService from './dbService.js';
+const axios = require('axios');
+const dbService = require('./dbService.js');
 
 class ApiService {
   constructor () {
@@ -18,20 +18,16 @@ class ApiService {
     this.initializing = new Promise(async (resolve) => {
       // Load server URL from database
       this.baseUrl = await dbService.getServerUrl();
-      console.log('Server URL loaded:', this.baseUrl);
-
       // Load token from database if exists
       const authInfo = await dbService.getAuthInfo();
       if (authInfo && authInfo.token) {
         // Check if token needs to be renewed
         if (await this.shouldRenewToken(authInfo)) {
-          console.log('Token is approaching expiration, renewing...');
           if (authInfo.username && authInfo.password) {
             await this.login(authInfo.username, authInfo.password);
           }
         } else {
           this.token = authInfo.token;
-          console.log('Token loaded from database (valid)');
         }
       }
       resolve();
@@ -72,8 +68,6 @@ class ApiService {
 
       // Save credentials and token to database
       await dbService.saveAuthInfo(username, password, this.token);
-
-      console.log('Login successful, token updated and saved to database');
       return { success: true, data: response.data };
     } catch (error) {
       console.error('Login failed:', error.message);
@@ -135,7 +129,6 @@ class ApiService {
 
         // Save devices to database
         await dbService.saveDevices(devices);
-        console.log(`Stored ${devices.length} devices with company IDs`);
       }
 
       return { success: true, data: response.data };
@@ -203,7 +196,6 @@ class ApiService {
 
       // Format current date as YYYY-MM-DD
       const currentDate = new Date().toISOString().split('T')[ 0 ];
-      console.log("🚀 ~ ApiService ~ getDeviceLogs ~ currentDate:", currentDate);
 
       const response = await axios.get(
         `${this.baseUrl}/iclock/api/transactions/?page_size=1000&start_time=${currentDate}`,
@@ -213,7 +205,6 @@ class ApiService {
       );
 
       // Transform the response data before returning
-      console.log("🚀 ~ ApiService ~ getDeviceLogs ~ response.data:", response.data);
       const transformedData = await this.transformDeviceLogs(response.data);
       return { success: true, rawData: response.data, data: transformedData };
     } catch (error) {
@@ -235,7 +226,7 @@ class ApiService {
         key: "myFingerGoesClickBangClackBang"
       };
 
-      const response = await axios.post('http://localhost:3000/api/v1/attendances/import-device-data', payload, {
+      const response = await axios.post('https://api-staging.easterncorporation.net/api/v1/attendances/import-device-data', payload, {
         headers: {
           'Content-Type': 'application/json'
         }
@@ -259,7 +250,6 @@ class ApiService {
     // Check if token needs renewal before running sync
     const authInfo = await dbService.getAuthInfo();
     if (await this.shouldRenewToken(authInfo)) {
-      console.log('Token approaching expiration, renewing before sync');
       const loginResult = await this.login(authInfo.username, authInfo.password);
       if (!loginResult.success) {
         console.error('Failed to renew token before sync');
@@ -319,4 +309,4 @@ class ApiService {
 }
 
 const apiService = new ApiService();
-export default apiService;
+module.exports = apiService;

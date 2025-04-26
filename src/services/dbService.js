@@ -1,11 +1,5 @@
-import { Low } from 'lowdb';
-import { JSONFile } from 'lowdb/node';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-// Get current file's directory (equivalent to __dirname in CommonJS)
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// Use path module
+const path = require('path');
 
 // Define the file path for our database
 const dbFilePath = path.join(__dirname, '../../db.json');
@@ -21,29 +15,53 @@ const defaultData = {
   },
   config: {
     syncPeriod: '5', // Default to 5 minutes
-    serverUrl: 'http://192.168.1.100:90',
+    serverUrl: null,
     lastSyncTime: null,
     isRunning: false
   },
   devices: [] // Store devices and their company IDs
 };
 
-// Create adapter and db instance
-const adapter = new JSONFile(dbFilePath);
-const db = new Low(adapter, defaultData);
+// Declare variables that will be initialized in the init method
+let db;
+let adapter;
 
 class DbService {
   constructor () {
     this.initialized = false;
+    this.initPromise = null;
   }
 
   async init() {
-    if (!this.initialized) {
-      await db.read();
-      this.initialized = true;
-      console.log('Database initialized:', dbFilePath);
+    if (this.initPromise) {
+      return this.initPromise;
     }
-    return db.data;
+
+    this.initPromise = new Promise(async (resolve) => {
+      if (!this.initialized) {
+        try {
+          // Use dynamic import for lowdb
+          const lowdbModule = await import('lowdb');
+          const { Low } = lowdbModule;
+
+          const JSONFileModule = await import('lowdb/node');
+          const { JSONFile } = JSONFileModule;
+
+          // Create adapter and db instance
+          adapter = new JSONFile(dbFilePath);
+          db = new Low(adapter, defaultData);
+
+          await db.read();
+          this.initialized = true;
+          console.log('Database initialized:', dbFilePath);
+        } catch (error) {
+          console.error('Error initializing database:', error);
+        }
+      }
+      resolve(db ? db.data : defaultData);
+    });
+
+    return this.initPromise;
   }
 
   async getData() {
@@ -52,7 +70,9 @@ class DbService {
   }
 
   async saveData() {
-    await db.write();
+    if (db) {
+      await db.write();
+    }
   }
 
   // Authentication Methods
@@ -138,11 +158,9 @@ class DbService {
 
     // Convert deviceId to string to ensure consistent comparison
     const deviceIdStr = String(deviceId);
-    console.log("🚀 ~ DbService ~ updateDeviceCompanyId ~ deviceId converted to string:", deviceIdStr);
 
     // Find device by string comparison
     const deviceIndex = db.data.devices.findIndex(d => String(d.id) === deviceIdStr);
-    console.log("🚀 ~ DbService ~ updateDeviceCompanyId ~ deviceIndex:", deviceIndex);
 
     if (deviceIndex >= 0) {
       // Update existing device
@@ -169,4 +187,4 @@ class DbService {
 }
 
 const dbService = new DbService();
-export default dbService;
+module.exports = dbService;

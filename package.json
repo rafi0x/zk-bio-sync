@@ -1,13 +1,15 @@
 {
   "name": "zk-bio-sync",
   "version": "1.0.0",
-  "type": "module",
-  "main": "server.js",
+  "main": "main.js",
   "scripts": {
-    "start": "node server.js",
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "nodemon server.js",
-    "cleanup": "node src/utils/cleanupDb.js"
+    "start": "electron .",
+    "dev": "nodemon --exec electron . --watch main.js --watch src --watch server-electron.js",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder",
+    "server": "node server.js",
+    "build": "node build.js",
+    "winbuild": "electron-builder --win"
   },
   "keywords": [
     "zk",
@@ -18,6 +20,7 @@
   "license": "ISC",
   "description": "Sync service for ZK Bio devices",
   "dependencies": {
+    "auto-launch": "^5.0.6",
     "axios": "^1.9.0",
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
@@ -26,6 +29,52 @@
     "socket.io": "^4.8.1"
   },
   "devDependencies": {
-    "nodemon": "^3.0.3"
+    "electron": "^30.1.0",
+    "electron-builder": "^24.13.0",
+    "nodemon": "^3.0.3",
+    "sharp": "^0.34.1"
+  },
+  "build": {
+    "appId": "com.zkbiosync.app",
+    "productName": "HrmX Sync",
+    "directories": {
+      "output": "dist"
+    },
+    "icon": "public/icon.png",
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "public/icon.png"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "icon": "public/icon.png"
+    },
+    "mac": {
+      "icon": "public/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "files": [
+      "**/*",
+      "!**/*.md",
+      "!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}",
+      "!**/node_modules/*/{test,__tests__,tests,powered-test,example,examples}",
+      "!**/node_modules/*.d.ts",
+      "!**/node_modules/.bin",
+      "!dist",
+      "!build",
+      "!.github",
+      "!.vscode",
+      "!docs"
+    ]
   }
 }

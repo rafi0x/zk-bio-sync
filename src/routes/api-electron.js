@@ -2,6 +2,7 @@ const express = require('express');
 const apiService = require('../services/apiService.js');
 const dbService = require('../services/dbService.js');
 const syncService = require('../services/syncService.js');
+const { formatDeviceData } = require('../utils/common.js');
 
 const router = express.Router();
 
@@ -163,35 +164,7 @@ router.get('/devices', async (req, res) => {
     // Get devices from the ZK Bio API
     const apiResult = await apiService.getDevices();
 
-    if (!apiResult.success) {
-      return res.status(400).json({
-        success: false,
-        error: apiResult.error || 'Failed to fetch devices from API'
-      });
-    }
-
-    // Get stored device settings
-    const storedDevices = await dbService.getDevices();
-    const storedDevicesMap = new Map();
-
-    // Create a map for easy lookup
-    storedDevices.forEach(device => {
-      storedDevicesMap.set(device.id.toString(), device);
-    });
-
-    // Merge API device data with stored company IDs
-    const devices = apiResult.data.data.map(device => {
-      const storedDevice = storedDevicesMap.get(device.id.toString());
-      return {
-        id: storedDevice.id,
-        sn: device.sn,
-        alias: device.alias,
-        ip: device.ip_address,
-        lastActivity: device.last_activity,
-        companyId: storedDevice.companyId,
-        status: device.status
-      };
-    });
+    const devices = await formatDeviceData(apiResult);
 
     return res.json({
       success: true,

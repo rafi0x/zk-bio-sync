@@ -40,6 +40,9 @@ document.addEventListener('DOMContentLoaded', () => {
   let countdownInterval = null;
   let settingsConfigured = false;
 
+  // Detect if we're running in Electron
+  const isElectron = window.api !== undefined;
+
   // Socket.io connection
   const socket = io();
 
@@ -53,11 +56,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function switchTab(tabName) {
     // Reset tab styling
-    dashboardTab.classList.remove('text-blue-400', 'border-b-2', 'border-blue-500');
+    dashboardTab.classList.remove('text-red-400', 'border-b-2', 'border-red-500');
     dashboardTab.classList.add('text-gray-400', 'hover:text-white');
-    settingsTab.classList.remove('text-blue-400', 'border-b-2', 'border-blue-500');
+    settingsTab.classList.remove('text-red-400', 'border-b-2', 'border-red-500');
     settingsTab.classList.add('text-gray-400', 'hover:text-white');
-    devicesTab.classList.remove('text-blue-400', 'border-b-2', 'border-blue-500');
+    devicesTab.classList.remove('text-red-400', 'border-b-2', 'border-red-500');
     devicesTab.classList.add('text-gray-400', 'hover:text-white');
 
     // Hide all tab contents
@@ -67,15 +70,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Activate selected tab
     if (tabName === 'dashboard') {
-      dashboardTab.classList.add('text-blue-400', 'border-b-2', 'border-blue-500');
+      dashboardTab.classList.add('text-red-400', 'border-b-2', 'border-red-500');
       dashboardTab.classList.remove('text-gray-400', 'hover:text-white');
       dashboardContent.classList.add('active');
     } else if (tabName === 'settings') {
-      settingsTab.classList.add('text-blue-400', 'border-b-2', 'border-blue-500');
+      settingsTab.classList.add('text-red-400', 'border-b-2', 'border-red-500');
       settingsTab.classList.remove('text-gray-400', 'hover:text-white');
       settingsContent.classList.add('active');
     } else if (tabName === 'devices') {
-      devicesTab.classList.add('text-blue-400', 'border-b-2', 'border-blue-500');
+      devicesTab.classList.add('text-red-400', 'border-b-2', 'border-red-500');
       devicesTab.classList.remove('text-gray-400', 'hover:text-white');
       devicesContent.classList.add('active');
     }
@@ -94,6 +97,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Socket events
   socket.on('log', handleLogEvent);
+
+  // Set up Electron IPC listeners if in Electron
+  if (isElectron) {
+    window.api.receive('sync-status', (status) => {
+      addLogEntry({
+        timestamp: new Date().toISOString(),
+        api: 'System',
+        message: status
+      });
+    });
+
+    window.api.receive('sync-results', (results) => {
+      if (Array.isArray(results)) {
+        results.forEach(result => handleLogEvent(result));
+      } else if (results) {
+        handleLogEvent(results);
+      }
+    });
+  }
 
   // Application Functions
   async function initializeApplication() {
@@ -121,10 +143,9 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       // Check current sync status
-      const statusResponse = await fetch('/api/sync/status');
-      const statusData = await statusResponse.json();
+      const statusData = await fetchSyncStatus();
 
-      if (statusData.isRunning) {
+      if (statusData && statusData.isRunning) {
         // Update UI for running state
         isRunning = true;
         updateSyncUI(true);
@@ -160,23 +181,50 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  async function fetchSyncStatus() {
+    try {
+      // Use Electron IPC if available, otherwise use fetch
+      if (isElectron) {
+        // In Electron, we would send a message to the main process
+        return { isRunning: false }; // Default for now
+      } else {
+        const statusResponse = await fetch('/api/sync/status');
+        return await statusResponse.json();
+      }
+    } catch (error) {
+      console.error('Error fetching sync status:', error);
+      return { isRunning: false };
+    }
+  }
+
   async function fetchSettings() {
     try {
-      // Load saved credentials
-      const credentialsResponse = await fetch('/api/settings/credentials');
-      const credentialsData = await credentialsResponse.json();
+      if (isElectron) {
+        // In Electron, we would send a message to the main process
+        // For now, return default values as placeholder
+        return {
+          username: 'admin',
+          password: '********',
+          syncPeriod: '5',
+          hasCredentials: true
+        };
+      } else {
+        // Load saved credentials
+        const credentialsResponse = await fetch('/api/settings/credentials');
+        const credentialsData = await credentialsResponse.json();
 
-      // Load saved sync period
-      const syncPeriodResponse = await fetch('/api/settings/syncperiod');
-      const syncPeriodData = await syncPeriodResponse.json();
+        // Load saved sync period
+        const syncPeriodResponse = await fetch('/api/settings/syncperiod');
+        const syncPeriodData = await syncPeriodResponse.json();
 
-      return {
-        username: credentialsData.username,
-        password: credentialsData.hasCredentials ? '********' : '',
-        syncPeriod: syncPeriodData.syncPeriod,
-        hasCredentials: credentialsData.hasCredentials,
-        lastLogin: credentialsData.lastLogin
-      };
+        return {
+          username: credentialsData.username,
+          password: credentialsData.hasCredentials ? '********' : '',
+          syncPeriod: syncPeriodData.syncPeriod,
+          hasCredentials: credentialsData.hasCredentials,
+          lastLogin: credentialsData.lastLogin
+        };
+      }
     } catch (error) {
       console.error('Error fetching settings:', error);
       return null;
@@ -184,9 +232,13 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   async function fetchServerConfig() {
-    // In a real app, this would fetch from the database via an API
-    // For now, we'll return the hardcoded value
-    return { url: 'http://192.168.1.100:90' };
+    if (isElectron) {
+      // In Electron, we would send a message to the main process
+      return { url: 'http://192.168.1.100:90' }; // Default for now
+    } else {
+      // In a real app, this would fetch from the database via an API
+      return { url: 'http://192.168.1.100:90' };
+    }
   }
 
   async function toggleSync() {
@@ -217,25 +269,14 @@ document.addEventListener('DOMContentLoaded', () => {
       let password = passwordInput.value;
       if (!password || password === '********') {
         // If we don't have a new password, use the saved one
-        // In a real implementation, this would be handled better
         password = 'admin7445'; // Default from postman collection for demo
       }
 
-      const response = await fetch('/api/sync/start', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          username: settings.username || usernameInput.value,
-          password: password,
-          period: settings.syncPeriod || syncPeriodSelect.value
-        }),
-      });
+      // Use Electron IPC if available, otherwise use fetch
+      if (isElectron) {
+        // Trigger sync in main process via IPC
+        window.api.send('sync-now');
 
-      const data = await response.json();
-
-      if (response.ok) {
         isRunning = true;
         updateSyncUI(true);
         startCountdown();
@@ -246,12 +287,38 @@ document.addEventListener('DOMContentLoaded', () => {
           message: `Sync process started with ${settings.syncPeriod || syncPeriodSelect.value} minute interval`,
         });
       } else {
-        addLogEntry({
-          timestamp: new Date().toISOString(),
-          api: 'System',
-          success: false,
-          error: data.error || 'Failed to start sync',
+        const response = await fetch('/api/sync/start', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            username: settings.username || usernameInput.value,
+            password: password,
+            period: settings.syncPeriod || syncPeriodSelect.value
+          }),
         });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          isRunning = true;
+          updateSyncUI(true);
+          startCountdown();
+
+          addLogEntry({
+            timestamp: new Date().toISOString(),
+            api: 'System',
+            message: `Sync process started with ${settings.syncPeriod || syncPeriodSelect.value} minute interval`,
+          });
+        } else {
+          addLogEntry({
+            timestamp: new Date().toISOString(),
+            api: 'System',
+            success: false,
+            error: data.error || 'Failed to start sync',
+          });
+        }
       }
     } catch (error) {
       addLogEntry({
@@ -265,23 +332,38 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function stopSync() {
     try {
-      const response = await fetch('/api/sync/stop', {
-        method: 'POST',
-      });
+      if (isElectron) {
+        // Stop sync in main process via IPC
+        window.api.send('stop-sync');
 
-      const data = await response.json();
-
-      if (response.ok) {
         isRunning = false;
         updateSyncUI(false);
         stopCountdown();
-      } else {
+
         addLogEntry({
           timestamp: new Date().toISOString(),
           api: 'System',
-          success: false,
-          error: data.message || 'Failed to stop sync',
+          message: 'Sync stopped',
         });
+      } else {
+        const response = await fetch('/api/sync/stop', {
+          method: 'POST',
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          isRunning = false;
+          updateSyncUI(false);
+          stopCountdown();
+        } else {
+          addLogEntry({
+            timestamp: new Date().toISOString(),
+            api: 'System',
+            success: false,
+            error: data.message || 'Failed to stop sync',
+          });
+        }
       }
     } catch (error) {
       addLogEntry({
@@ -313,7 +395,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     try {
       // For a real implementation, we'd save server URL here too
-      // For this demo, we'll just log it
       console.log('Server URL would be saved:', serverUrl);
 
       // If we're already running, stop the sync first
@@ -322,20 +403,8 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       // Make a dummy login request to verify credentials
-      const loginResponse = await fetch('/api/sync/start', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          username,
-          password,
-          period,
-          dryRun: true // Indicate this is just a test
-        }),
-      });
-
-      if (loginResponse.ok) {
+      if (isElectron) {
+        // In Electron, we would send credentials to the main process
         settingsConfigured = true;
 
         addLogEntry({
@@ -347,13 +416,39 @@ document.addEventListener('DOMContentLoaded', () => {
         // Switch back to dashboard
         switchTab('dashboard');
       } else {
-        const data = await loginResponse.json();
-        addLogEntry({
-          timestamp: new Date().toISOString(),
-          api: 'System',
-          success: false,
-          error: data.error || 'Invalid credentials',
+        const loginResponse = await fetch('/api/sync/start', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            username,
+            password,
+            period,
+            dryRun: true // Indicate this is just a test
+          }),
         });
+
+        if (loginResponse.ok) {
+          settingsConfigured = true;
+
+          addLogEntry({
+            timestamp: new Date().toISOString(),
+            api: 'System',
+            message: 'Settings saved successfully',
+          });
+
+          // Switch back to dashboard
+          switchTab('dashboard');
+        } else {
+          const data = await loginResponse.json();
+          addLogEntry({
+            timestamp: new Date().toISOString(),
+            api: 'System',
+            success: false,
+            error: data.error || 'Invalid credentials',
+          });
+        }
       }
     } catch (error) {
       addLogEntry({
@@ -374,7 +469,7 @@ document.addEventListener('DOMContentLoaded', () => {
         </svg>
         Stop Sync
       `;
-      toggleSyncBtn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+      toggleSyncBtn.classList.remove('bg-black', 'hover:bg-black');
       toggleSyncBtn.classList.add('bg-red-600', 'hover:bg-red-700');
 
       // Update status indicators
@@ -382,9 +477,11 @@ document.addEventListener('DOMContentLoaded', () => {
       statusIndicator.classList.remove('text-gray-400');
       statusIndicator.classList.add('text-green-400');
 
-      syncStatusIcon.textContent = '⟳';
-      syncStatusIcon.classList.remove('text-gray-500');
-      syncStatusIcon.classList.add('text-green-500');
+      if (syncStatusIcon) {
+        syncStatusIcon.textContent = '✓'; // Check icon for running
+        syncStatusIcon.classList.remove('text-gray-500');
+        syncStatusIcon.classList.add('text-green-500');
+      }
 
       syncStatusText.textContent = 'Running';
       syncStatusText.classList.remove('text-gray-400');
@@ -405,16 +502,18 @@ document.addEventListener('DOMContentLoaded', () => {
         Start Sync
       `;
       toggleSyncBtn.classList.remove('bg-red-600', 'hover:bg-red-700');
-      toggleSyncBtn.classList.add('bg-blue-600', 'hover:bg-blue-700');
+      toggleSyncBtn.classList.add('bg-black', 'hover:bg-black');
 
       // Update status indicators
       statusIndicator.textContent = 'Inactive';
       statusIndicator.classList.remove('text-green-400');
       statusIndicator.classList.add('text-gray-400');
 
-      syncStatusIcon.textContent = '⏸';
-      syncStatusIcon.classList.remove('text-green-500');
-      syncStatusIcon.classList.add('text-gray-500');
+      if (syncStatusIcon) {
+        syncStatusIcon.textContent = '✗'; // Cross icon for not running
+        syncStatusIcon.classList.remove('text-green-500');
+        syncStatusIcon.classList.add('text-gray-500');
+      }
 
       syncStatusText.textContent = 'Not Running';
       syncStatusText.classList.remove('text-green-400');
@@ -505,17 +604,34 @@ document.addEventListener('DOMContentLoaded', () => {
     devicesTableContainer.classList.add('hidden');
 
     try {
-      const response = await fetch('/api/devices');
-      const data = await response.json();
+      if (isElectron) {
+        // Set up listener for device results
+        window.api.receive('devices-result', (result) => {
+          if (result.success) {
+            renderDevicesTable(result.devices || []);
+            // Hide loading, show table
+            devicesLoading.classList.add('hidden');
+            devicesTableContainer.classList.remove('hidden');
+          } else {
+            throw new Error(result.error || 'Failed to load devices');
+          }
+        });
 
-      if (response.ok && data.success) {
-        renderDevicesTable(data.devices);
-
-        // Hide loading, show table
-        devicesLoading.classList.add('hidden');
-        devicesTableContainer.classList.remove('hidden');
+        // Request devices from main process
+        window.api.send('get-devices');
       } else {
-        throw new Error(data.error || 'Failed to load devices');
+        const response = await fetch('/api/devices');
+        const data = await response.json();
+
+        if (response.ok && data.success) {
+          renderDevicesTable(data.devices);
+
+          // Hide loading, show table
+          devicesLoading.classList.add('hidden');
+          devicesTableContainer.classList.remove('hidden');
+        } else {
+          throw new Error(data.error || 'Failed to load devices');
+        }
       }
     } catch (error) {
       console.error('Error loading devices:', error);
@@ -555,20 +671,18 @@ document.addEventListener('DOMContentLoaded', () => {
       row.className = 'border-t border-gray-800';
 
       row.innerHTML = `
-        <td class="px-4 py-3">${device.id}</td>
-        <td class="px-4 py-3">${device.alias || device.sn || 'Unknown'}</td>
         <td class="px-4 py-3">${device.ip || 'N/A'}</td>
         <td class="px-4 py-3">
           <div class="flex items-center">
             <input 
               type="text" 
-              class="w-36 px-3 py-1 bg-gray-800 border border-gray-700 rounded-md mr-2 focus:outline-none focus:ring-2 focus:ring-blue-500" 
+              class="w-36 px-3 py-1 bg-gray-800 border border-gray-700 rounded-md mr-2 focus:outline-none focus:ring-2 focus:ring-red-500" 
               value="${device.companyId || ''}" 
               placeholder="Enter ID"
               data-device-id="${device.id}"
             >
             <button
-              class="save-company-id px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm"
+              class="save-company-id px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm"
               data-device-id="${device.id}"
             >
               Save
@@ -659,13 +773,13 @@ document.addEventListener('DOMContentLoaded', () => {
     } else if (data.message) {
       entry.innerHTML = `
         <div class="flex items-start">
-          <span class="text-blue-400 font-bold mr-2">●</span>
+          <span class="text-red-400 font-bold mr-2">●</span>
           <div>
             <div class="flex items-center">
               <span class="text-gray-400">[${timestamp}]</span>
-              <span class="text-blue-400 font-semibold mx-2">[${data.api}]</span>
+              <span class="text-red-400 font-semibold mx-2">[${data.api || 'System'}]</span>
             </div>
-            <div class="pl-2 text-blue-300 mt-1">${data.message}</div>
+            <div class="pl-2 text-red-300 mt-1">${data.message}</div>
           </div>
         </div>
       `;
@@ -679,7 +793,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <div>
             <div class="flex items-center">
               <span class="text-gray-400">[${timestamp}]</span>
-              <span class="text-blue-400 font-semibold mx-2">[${data.api}]</span>
+              <span class="text-red-400 font-semibold mx-2">[${data.api || 'System'}]</span>
               <span class="${statusColor}">${statusIcon}</span>
             </div>
           </div>
@@ -704,7 +818,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const logEntries = Array.from(logsContainer.querySelectorAll('.log-entry'));
 
     // Create an exportable string
-    let exportText = "ZK Bio Sync - Log Export\n";
+    let exportText = "HrmX Sync - Log Export\n";
     exportText += `Generated: ${new Date().toLocaleString()}\n\n`;
 
     logEntries.reverse().forEach(entry => {

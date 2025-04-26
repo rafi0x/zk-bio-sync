@@ -1,5 +1,5 @@
-import apiService from './apiService.js';
-import dbService from './dbService.js';
+const apiService = require('./apiService.js');
+const dbService = require('./dbService.js');
 
 class SyncService {
   constructor () {
@@ -19,30 +19,25 @@ class SyncService {
 
       // If sync was running before app shutdown, restore it
       if (config.isRunning) {
-        console.log('Sync was active in previous session, attempting to restore...');
         const authInfo = await dbService.getAuthInfo();
 
         if (authInfo && authInfo.username && authInfo.password) {
           // We need to defer this to make sure everything is ready
           setTimeout(() => {
             if (global.io) { // Make sure socket.io is available
-              console.log('Restoring sync process with saved credentials');
               this.startSync(
                 config.syncPeriod,
                 { username: authInfo.username, password: authInfo.password },
                 global.io
               );
             } else {
-              console.log('Socket.io not available yet, cannot restore sync');
               dbService.updateSyncStatus(false);
             }
           }, 2000);
         } else {
-          console.log('No saved credentials found, cannot restore sync');
           await dbService.updateSyncStatus(false);
         }
       } else {
-        console.log('No active sync from previous session');
       }
     } catch (error) {
       console.error('Error initializing sync service:', error);
@@ -61,12 +56,14 @@ class SyncService {
     const loginResult = await apiService.login(credentials.username, credentials.password);
 
     if (!loginResult.success) {
-      io.emit('log', {
-        timestamp: new Date().toISOString(),
-        api: 'Login',
-        success: false,
-        error: loginResult.error,
-      });
+      if (io) {
+        io.emit('log', {
+          timestamp: new Date().toISOString(),
+          api: 'Login',
+          success: false,
+          error: loginResult.error,
+        });
+      }
       return { success: false, error: 'Login failed' };
     }
 
@@ -74,22 +71,32 @@ class SyncService {
     await dbService.updateSyncStatus(true);
 
     // Emit the login success message
-    io.emit('log', {
-      timestamp: new Date().toISOString(),
-      api: 'Login',
-      success: true,
-      message: 'Authentication successful',
-    });
+    if (io) {
+      io.emit('log', {
+        timestamp: new Date().toISOString(),
+        api: 'Login',
+        success: true,
+        message: 'Authentication successful',
+      });
+    }
 
     // Run initial sync
     const initialResults = await apiService.runSyncSequence();
-    initialResults.forEach(result => io.emit('log', result));
+    initialResults.forEach(result => {
+      if (io) {
+        io.emit('log', result);
+      }
+    });
 
     // Schedule recurring sync
     const intervalTime = this.syncPeriods[ period ] || this.syncPeriods[ '5' ];
     this.intervalId = setInterval(async () => {
       const results = await apiService.runSyncSequence();
-      results.forEach(result => io.emit('log', result));
+      results.forEach(result => {
+        if (io) {
+          io.emit('log', result);
+        }
+      });
     }, intervalTime);
 
     return { success: true };
@@ -132,4 +139,4 @@ class SyncService {
 }
 
 const syncService = new SyncService();
-export default syncService;
+module.exports = syncService;
