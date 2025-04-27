@@ -7,40 +7,35 @@ class SyncService {
     this.syncPeriods = {
       '5': 5 * 60 * 1000,     // 5 minutes
       '10': 10 * 60 * 1000,   // 10 minutes
-      '30': 30 * 60 * 1000,   // 30 minutes
+      '30': 30 * 1000,   // 30 minutes
     };
     this.initializeFromDb();
   }
 
   async initializeFromDb() {
     try {
+      console.log('[SyncService] Initializing from database...');
       // Load configuration from database
       const config = await dbService.getConfig();
+      console.log('[SyncService] Config:', config);
 
-      // If sync was running before app shutdown, restore it
-      if (config.isRunning) {
-        const authInfo = await dbService.getAuthInfo();
+      // Always start the sync process during initialization
+      const authInfo = await dbService.getAuthInfo();
+      console.log('[SyncService] Auth Info:', authInfo);
 
-        if (authInfo && authInfo.username && authInfo.password) {
-          // We need to defer this to make sure everything is ready
-          setTimeout(() => {
-            if (global.io) { // Make sure socket.io is available
-              this.startSync(
-                config.syncPeriod,
-                { username: authInfo.username, password: authInfo.password },
-                global.io
-              );
-            } else {
-              dbService.updateSyncStatus(false);
-            }
-          }, 2000);
-        } else {
-          await dbService.updateSyncStatus(false);
-        }
+      if (authInfo && authInfo.username && authInfo.password) {
+        // Start sync immediately
+        await this.startSync(
+          config.syncPeriod,
+          { username: authInfo.username, password: authInfo.password },
+          null // No socket.io in this context
+        );
       } else {
+        console.warn('[SyncService] Credentials are missing or invalid. Sync cannot be started.');
+        await dbService.updateSyncStatus(false);
       }
     } catch (error) {
-      console.error('Error initializing sync service:', error);
+      console.error('[SyncService] Error initializing from database:', error);
       await dbService.updateSyncStatus(false);
     }
   }
@@ -49,8 +44,9 @@ class SyncService {
     // Clear any existing interval
     this.stopSync();
 
-    // Save the sync period to database
+    // Save the sync period and status to the database
     await dbService.saveSyncPeriod(period);
+    await dbService.updateSyncStatus(true);
 
     // Initial login
     const loginResult = await apiService.login(credentials.username, credentials.password);
@@ -66,9 +62,6 @@ class SyncService {
       }
       return { success: false, error: 'Login failed' };
     }
-
-    // Update sync status in database
-    await dbService.updateSyncStatus(true);
 
     // Emit the login success message
     if (io) {

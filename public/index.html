@@ -12,7 +12,7 @@
     // Use try-catch for socket.io loading
     try {
       // When running in dev server
-      document.write('<script src="/socket.io/socket.io.js"><\/script>');
+      document.write('<script src="./js/socket.io.js"><\/script>');
     } catch (e) {
       console.warn('Error loading socket.io from server path, socket functions may be limited');
     }
@@ -203,7 +203,7 @@
         <div class="bg-gray-900 rounded-lg shadow-lg p-6 flex flex-col h-full">
           <h2 class="text-xl font-medium mb-6 flex-shrink-0">Connection Settings</h2>
 
-          <form id="settings-form" class="flex-grow scroll-container pr-2 -mr-2">
+          <form id="settings-form" class="flex-grow scroll-container p-4">
             <div class="space-y-6">
               <!-- Authentication Section -->
               <div class="space-y-4">

@@ -1,25 +1,16 @@
 {
   "auth": {
-    "username": "admin",
-    "password": "admin7445",
-    "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lkIjoxLCJ1c2VybmFtZSI6ImFkbWluIiwiZXhwIjoxNzQ2MzQyNjk0LCJlbWFpbCI6InJhZml1bGF3YWwyNEBnbWFpbC5jb20iLCJvcmlnX2lhdCI6MTc0NTczNzg5NH0.dOb5E-540VBz8-ShRD7coET-J4Q-3lX9vWi6NF2XZe0",
+    "username": "",
+    "password": "",
+    "token": "",
     "lastLogin": "2025-04-27T07:11:34.911Z",
     "tokenGeneratedAt": "2025-04-27T07:11:34.911Z"
   },
   "config": {
     "syncPeriod": "5",
     "lastSyncTime": "2025-04-27T07:11:34.913Z",
-    "serverUrl": "http://192.168.1.100:90",
-    "isRunning": false
+    "serverUrl": "",
+    "isRunning": true
   },
-  "devices": [
-    {
-      "id": 1,
-      "serialNumber": "UDP3245000900",
-      "name": "Office",
-      "companyId": "7cd486cc-d00c-42f9-a4be-98c29237e4c3",
-      "ipAddress": "192.168.1.101",
-      "lastSeen": "2025-04-27T07:11:35.049Z"
-    }
-  ]
+  "devices": []
 }

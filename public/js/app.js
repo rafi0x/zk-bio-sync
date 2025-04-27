@@ -229,32 +229,17 @@ document.addEventListener('DOMContentLoaded', () => {
         settingsConfigured = !!(settings.username && settings.password);
       }
 
-      // Check current sync status
-      const statusData = await fetchSyncStatus();
-
-      if (statusData && statusData.isRunning) {
-        // Update UI for running state
-        isRunning = true;
-        updateSyncUI(true);
-        startCountdown();
-
+      // Automatically start the sync process
+      if (settingsConfigured) {
+        await startSync();
+      } else {
+        updateSyncUI(false);
+        switchTab('settings');
         addLogEntry({
           timestamp: new Date().toISOString(),
           api: 'System',
-          message: 'Sync process is active from a previous session',
+          message: 'Please configure your settings before starting sync',
         });
-      } else {
-        updateSyncUI(false);
-
-        // Check if settings are configured - if not, switch to settings tab
-        if (!settingsConfigured) {
-          switchTab('settings');
-          addLogEntry({
-            timestamp: new Date().toISOString(),
-            api: 'System',
-            message: 'Please configure your settings before starting sync',
-          });
-        }
       }
 
     } catch (error) {

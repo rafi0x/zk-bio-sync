@@ -84,6 +84,13 @@ function createWindow() {
     console.log('[Electron] Main window closed');
     mainWindow = null;
   });
+
+  mainWindow.on('close', (event) => {
+    if (!app.isQuiting) {
+      event.preventDefault();
+      mainWindow.hide(); // Hide the window instead of closing it
+    }
+  });
 }
 
 function startServer() {
@@ -104,6 +111,9 @@ app.whenReady().then(() => {
   createWindow();
   createTray();
   setupIpcHandlers();
+
+  // Initialize sync service to resume sync if isRunning is true
+  syncService.initializeFromDb();
 
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -193,13 +203,13 @@ function setupIpcHandlers() {
   ipcMain.on('save-settings', async (event, data) => {
     try {
       // Log the settings being saved
-      console.log('[Electron] Saving settings:', { 
-        username: data.username, 
+      console.log('[Electron] Saving settings:', {
+        username: data.username,
         password: data.password ? '********' : 'not provided',
         period: data.period,
         serverUrl: data.serverUrl
       });
-      
+
       if (data.username && data.password) {
         await syncService.saveCredentials(data.username, data.password);
       }
