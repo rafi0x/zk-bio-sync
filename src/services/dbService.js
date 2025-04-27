@@ -1,8 +1,26 @@
 // Use path module
 const path = require('path');
+const fs = require('fs');
 
 // Define the file path for our database
-const dbFilePath = path.join(__dirname, '../../db.json');
+// Check if we're in Electron environment
+let dbFilePath;
+if (process.type === 'renderer' || process.versions.electron) {
+  // We're in Electron - use userData directory
+  const { app } = require('electron');
+  const userDataPath = app ? app.getPath('userData') : null;
+
+  if (userDataPath) {
+    dbFilePath = path.join(userDataPath, 'db.json');
+    console.log('Using Electron userData path for database:', dbFilePath);
+  } else {
+    // Fallback if app is not available
+    dbFilePath = path.join(__dirname, '../../db.json');
+  }
+} else {
+  // We're in Node.js (non-Electron)
+  dbFilePath = path.join(__dirname, '../../db.json');
+}
 
 // Define data structure - removing syncHistory
 const defaultData = {
@@ -51,7 +69,27 @@ class DbService {
           adapter = new JSONFile(dbFilePath);
           db = new Low(adapter, defaultData);
 
-          await db.read();
+          // Make sure directory exists
+          const dbDir = path.dirname(dbFilePath);
+          if (!fs.existsSync(dbDir)) {
+            fs.mkdirSync(dbDir, { recursive: true });
+          }
+
+          // If db.json doesn't exist, write the default data
+          try {
+            await db.read();
+            // Check if data structure is valid
+            if (!db.data || typeof db.data !== 'object') {
+              console.log('Database file exists but structure is invalid, resetting to default');
+              db.data = { ...defaultData };
+              await db.write();
+            }
+          } catch (readError) {
+            console.log('Database file does not exist or is corrupt, creating new one');
+            db.data = { ...defaultData };
+            await db.write();
+          }
+
           this.initialized = true;
           console.log('Database initialized:', dbFilePath);
         } catch (error) {

@@ -7,23 +7,46 @@ contextBridge.exposeInMainWorld(
   {
     send: (channel, data) => {
       // whitelist channels
-      let validChannels = [ 'sync-now', 'stop-sync', 'get-settings', 'save-settings', 'get-devices' ];
+      let validChannels = [
+        'sync-now',
+        'stop-sync',
+        'get-sync-status',
+        'get-settings',
+        'save-settings',
+        'get-devices'
+      ];
+
       if (validChannels.includes(channel)) {
         ipcRenderer.send(channel, data);
       }
     },
     receive: (channel, func) => {
-      let validChannels = [ 'sync-status', 'sync-results', 'settings', 'devices-result' ];
+      let validChannels = [
+        'sync-status',
+        'sync-status-result',
+        'sync-results',
+        'settings',
+        'settings-saved',
+        'devices-result'
+      ];
+
       if (validChannels.includes(channel)) {
+        // Remove any existing listeners for this channel to prevent duplicates
+        ipcRenderer.removeAllListeners(channel);
+
         // Deliberately strip event as it includes `sender` 
         ipcRenderer.on(channel, (event, ...args) => func(...args));
       }
-    }
+    },
+    // Add a way to check if the API is available
+    isAvailable: true
   }
 );
 
 // Fix for scrolling in Electron
 window.addEventListener('DOMContentLoaded', () => {
+  console.log("Preload script loaded, setting up event listeners for scrolling");
+
   // Add event listeners to enable scrolling in all scrollable containers
   document.querySelectorAll('.scroll-container').forEach(container => {
     container.addEventListener('wheel', (e) => {

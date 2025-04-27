@@ -136,6 +136,26 @@ class SyncService {
     const config = await dbService.getConfig();
     return config.syncPeriod || '5';
   }
+
+  // Add the missing getConfig method
+  async getConfig() {
+    return await dbService.getConfig();
+  }
+
+  // Add getServerUrl method
+  async getServerUrl() {
+    return await dbService.getServerUrl();
+  }
+
+  // Add saveCredentials method
+  async saveCredentials(username, password) {
+    return await dbService.saveAuthInfo(username, password, null);
+  }
+
+  // Add saveServerUrl method
+  async saveServerUrl(url) {
+    return await dbService.saveServerUrl(url);
+  }
 }
 
 const syncService = new SyncService();

@@ -7,7 +7,16 @@
   <title>HrmX Sync</title>
   <!-- Tailwind CSS via CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="/socket.io/socket.io.js"></script>
+  <!-- Socket.io with fallback -->
+  <script>
+    // Use try-catch for socket.io loading
+    try {
+      // When running in dev server
+      document.write('<script src="/socket.io/socket.io.js"><\/script>');
+    } catch (e) {
+      console.warn('Error loading socket.io from server path, socket functions may be limited');
+    }
+  </script>
   <style>
     /* Hide scrollbars for all elements but maintain scroll functionality */
     * {
@@ -328,7 +337,7 @@
     </footer>
   </div>
 
-  <script src="/js/app.js"></script>
+  <script src="./js/app.js"></script>
 </body>
 
 </html>

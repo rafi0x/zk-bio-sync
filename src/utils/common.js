@@ -1,11 +1,17 @@
 const dbService = require("../services/dbService");
 
+/**
+ * Format device data from API response and merge with stored company IDs
+ * @param {Object} payload - API response payload
+ * @returns {Array} - Formatted device array or throws an error
+ */
 async function formatDeviceData(payload) {
-  if (!payload.success) {
-    return res.status(400).json({
-      success: false,
-      error: payload.error || 'Failed to fetch devices from API'
-    });
+  if (!payload || !payload.success) {
+    throw new Error(payload?.error || 'Failed to fetch devices from API');
+  }
+
+  if (!payload.data || !payload.data.data || !Array.isArray(payload.data.data)) {
+    return []; // Return empty array if no devices found
   }
 
   // Get stored device settings
@@ -19,9 +25,11 @@ async function formatDeviceData(payload) {
 
   // Merge API device data with stored company IDs
   const devices = payload.data.data.map(device => {
-    const storedDevice = storedDevicesMap.get(device.id.toString());
+    const deviceId = device.id.toString();
+    const storedDevice = storedDevicesMap.get(deviceId) || { id: deviceId, companyId: null };
+
     return {
-      id: storedDevice.id,
+      id: device.id,
       sn: device.sn,
       alias: device.alias,
       ip: device.ip_address,

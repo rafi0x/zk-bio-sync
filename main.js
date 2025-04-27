@@ -12,31 +12,37 @@ let mainWindow;
 let tray = null;
 
 function createTray() {
-  tray = new Tray(path.join(__dirname, 'public', 'icon.png'));
-  const contextMenu = Menu.buildFromTemplate([
-    {
-      label: 'Show',
-      click: () => {
-        if (mainWindow) {
-          mainWindow.show();
+  // Use try-catch to handle potential icon loading issues
+  try {
+    const iconPath = path.join(__dirname, 'public', 'icon.png');
+    tray = new Tray(iconPath);
+    const contextMenu = Menu.buildFromTemplate([
+      {
+        label: 'Show',
+        click: () => {
+          if (mainWindow) {
+            mainWindow.show();
+          }
+        }
+      },
+      {
+        label: 'Quit',
+        click: () => {
+          app.isQuiting = true; // Set the flag to true before quitting
+          app.quit();
         }
       }
-    },
-    {
-      label: 'Quit',
-      click: () => {
-        app.isQuiting = true; // Set the flag to true before quitting
-        app.quit();
+    ]);
+    tray.setToolTip('HrmX Sync');
+    tray.setContextMenu(contextMenu);
+    tray.on('double-click', () => {
+      if (mainWindow) {
+        mainWindow.show();
       }
-    }
-  ]);
-  tray.setToolTip('HrmX Sync');
-  tray.setContextMenu(contextMenu);
-  tray.on('double-click', () => {
-    if (mainWindow) {
-      mainWindow.show();
-    }
-  });
+    });
+  } catch (error) {
+    console.error('Error creating tray:', error);
+  }
 }
 
 function createWindow() {
@@ -56,24 +62,35 @@ function createWindow() {
 
   // Load the app
   if (app.isPackaged) {
+    const indexPath = path.join(__dirname, 'public', 'index.html');
     mainWindow.loadURL(url.format({
-      pathname: path.join(__dirname, 'public', 'index.html'),
+      pathname: indexPath,
       protocol: 'file:',
       slashes: true
     }));
+
+    // For debugging production build
+    mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
+      console.error('Failed to load:', errorCode, errorDescription);
+    });
   } else {
     mainWindow.loadURL('http://localhost:4000');
   }
 
-  // Open DevTools in a separate window (detached) when not packaged
+  // Open DevTools in a separate window (detached)
   if (!app.isPackaged) {
-    mainWindow.webContents.openDevTools({ mode: 'detach' });
   }
+  mainWindow.webContents.openDevTools({ mode: 'detach' });
 
   Menu.setApplicationMenu(null);
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
+
+    // For debugging - uncomment to open DevTools in production
+    // if (app.isPackaged) {
+    //   mainWindow.webContents.openDevTools();
+    // }
   });
 
   mainWindow.on('close', (event) => {
@@ -138,7 +155,7 @@ function setupIpcHandlers() {
 
   ipcMain.on('stop-sync', async (event) => {
     try {
-      const result = await syncService.stopSync();
+      await syncService.stopSync();
       mainWindow.webContents.send('sync-status', 'Synchronization stopped');
     } catch (error) {
       mainWindow.webContents.send('sync-results', {
@@ -150,14 +167,37 @@ function setupIpcHandlers() {
     }
   });
 
+  // Add explicit handler for get-sync-status to fix the "res is not defined" error
+  ipcMain.on('get-sync-status', async (event) => {
+    try {
+      const config = await syncService.getConfig();
+      mainWindow.webContents.send('sync-status-result', {
+        success: true,
+        isRunning: config.isRunning || false,
+        lastSyncTime: config.lastSyncTime || new Date().toISOString(),
+        syncPeriod: config.syncPeriod || '5'
+      });
+    } catch (error) {
+      console.error('[Electron] Error getting sync status:', error);
+      mainWindow.webContents.send('sync-status-result', {
+        success: false,
+        isRunning: false,
+        error: error.message || 'Failed to get sync status'
+      });
+    }
+  });
+
   ipcMain.on('get-settings', async (event) => {
     try {
       const authInfo = await syncService.getSavedCredentials();
       const syncPeriod = await syncService.getSavedSyncPeriod();
+      const serverUrl = await syncService.getServerUrl();
+
       mainWindow.webContents.send('settings', {
         username: authInfo.username,
         password: authInfo.password ? '********' : '',
         syncPeriod: syncPeriod,
+        serverUrl: serverUrl,
         hasCredentials: !!(authInfo.username && authInfo.password),
         lastLogin: authInfo.lastLogin
       });
@@ -171,21 +211,76 @@ function setupIpcHandlers() {
     }
   });
 
+  ipcMain.on('save-settings', async (event, data) => {
+    try {
+      if (data.username && data.password) {
+        await syncService.saveCredentials(data.username, data.password);
+      }
+
+      if (data.period) {
+        await syncService.saveSyncPeriod(data.period);
+      }
+
+      if (data.serverUrl) {
+        await syncService.saveServerUrl(data.serverUrl);
+      }
+
+      mainWindow.webContents.send('settings-saved', {
+        success: true
+      });
+    } catch (error) {
+      mainWindow.webContents.send('settings-saved', {
+        success: false,
+        error: error.message || 'Failed to save settings'
+      });
+    }
+  });
+
   ipcMain.on('get-devices', async (event) => {
     try {
+      // First check if we have credentials and a token
+      const authInfo = await syncService.getSavedCredentials();
+
+      if (!authInfo || !authInfo.username || !authInfo.password) {
+        // No valid credentials
+        mainWindow.webContents.send('devices-result', {
+          success: false,
+          error: 'No valid credentials found. Please configure your settings first.'
+        });
+        return;
+      }
+
+      // Try to get devices with proper error handling
       const response = await apiService.getDevices();
 
-      const devices = await formatDeviceData(response);
+      if (!response.success) {
+        // API call failed - send the error
+        mainWindow.webContents.send('devices-result', {
+          success: false,
+          error: response.error || 'Failed to fetch devices from the server'
+        });
+        return;
+      }
 
-      mainWindow.webContents.send('devices-result', {
-        success: true,
-        devices: devices
-      });
+      // We have devices data, format it
+      try {
+        const devices = await formatDeviceData(response);
+        mainWindow.webContents.send('devices-result', {
+          success: true,
+          devices: devices || []
+        });
+      } catch (formatError) {
+        console.error('[Electron] Error formatting device data:', formatError);
+        mainWindow.webContents.send('devices-result', {
+          success: false,
+          error: 'Error processing device data: ' + formatError.message
+        });
+      }
     } catch (error) {
       console.error('[Electron] Error getting devices:', error);
       mainWindow.webContents.send('devices-result', {
         success: false,
-        error: error.message || 'Failed to get devices'
+        error: error.message || 'Failed to load devices'
       });
     }
   });

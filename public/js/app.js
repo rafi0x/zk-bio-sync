@@ -1,4 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
+  console.log("DOM Content Loaded - Initializing Application");
+
   // DOM Elements - Main UI
   const dashboardTab = document.getElementById('dashboard-tab');
   const settingsTab = document.getElementById('settings-tab');
@@ -42,42 +44,79 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Detect if we're running in Electron
   const isElectron = window.api !== undefined;
+  console.log("Running in Electron:", isElectron);
 
-  // Socket.io connection
-  const socket = io();
+  // Socket.io connection - handle gracefully if not available
+  let socket;
+  try {
+    if (typeof io !== 'undefined') {
+      socket = io();
+      console.log("Socket.io initialized");
+    } else {
+      console.log("Socket.io not available, running in standalone mode");
+    }
+  } catch (error) {
+    console.error("Failed to initialize socket.io:", error);
+    // Continue without socket.io
+  }
 
-  // Tab Management
-  dashboardTab.addEventListener('click', () => switchTab('dashboard'));
-  settingsTab.addEventListener('click', () => switchTab('settings'));
-  devicesTab.addEventListener('click', () => {
-    switchTab('devices');
-    loadDevices();
-  });
+  // Tab Management - Add null checks and error handling
+  if (dashboardTab) {
+    dashboardTab.addEventListener('click', (e) => {
+      console.log("Dashboard tab clicked");
+      e.preventDefault();
+      switchTab('dashboard');
+    });
+  }
+
+  if (settingsTab) {
+    settingsTab.addEventListener('click', (e) => {
+      console.log("Settings tab clicked");
+      e.preventDefault();
+      switchTab('settings');
+    });
+  }
+
+  if (devicesTab) {
+    devicesTab.addEventListener('click', (e) => {
+      console.log("Devices tab clicked");
+      e.preventDefault();
+      switchTab('devices');
+      loadDevices();
+    });
+  }
 
   function switchTab(tabName) {
+    console.log(`Switching to tab: ${tabName}`);
     // Reset tab styling
-    dashboardTab.classList.remove('text-red-400', 'border-b-2', 'border-red-500');
-    dashboardTab.classList.add('text-gray-400', 'hover:text-white');
-    settingsTab.classList.remove('text-red-400', 'border-b-2', 'border-red-500');
-    settingsTab.classList.add('text-gray-400', 'hover:text-white');
-    devicesTab.classList.remove('text-red-400', 'border-b-2', 'border-red-500');
-    devicesTab.classList.add('text-gray-400', 'hover:text-white');
+    if (dashboardTab) {
+      dashboardTab.classList.remove('text-red-400', 'border-b-2', 'border-red-500');
+      dashboardTab.classList.add('text-gray-400', 'hover:text-white');
+    }
+    if (settingsTab) {
+      settingsTab.classList.remove('text-red-400', 'border-b-2', 'border-red-500');
+      settingsTab.classList.add('text-gray-400', 'hover:text-white');
+    }
+    if (devicesTab) {
+      devicesTab.classList.remove('text-red-400', 'border-b-2', 'border-red-500');
+      devicesTab.classList.add('text-gray-400', 'hover:text-white');
+    }
 
     // Hide all tab contents
-    dashboardContent.classList.remove('active');
-    settingsContent.classList.remove('active');
-    devicesContent.classList.remove('active');
+    if (dashboardContent) dashboardContent.classList.remove('active');
+    if (settingsContent) settingsContent.classList.remove('active');
+    if (devicesContent) devicesContent.classList.remove('active');
 
     // Activate selected tab
-    if (tabName === 'dashboard') {
+    if (tabName === 'dashboard' && dashboardTab && dashboardContent) {
       dashboardTab.classList.add('text-red-400', 'border-b-2', 'border-red-500');
       dashboardTab.classList.remove('text-gray-400', 'hover:text-white');
       dashboardContent.classList.add('active');
-    } else if (tabName === 'settings') {
+    } else if (tabName === 'settings' && settingsTab && settingsContent) {
       settingsTab.classList.add('text-red-400', 'border-b-2', 'border-red-500');
       settingsTab.classList.remove('text-gray-400', 'hover:text-white');
       settingsContent.classList.add('active');
-    } else if (tabName === 'devices') {
+    } else if (tabName === 'devices' && devicesTab && devicesContent) {
       devicesTab.classList.add('text-red-400', 'border-b-2', 'border-red-500');
       devicesTab.classList.remove('text-gray-400', 'hover:text-white');
       devicesContent.classList.add('active');
@@ -87,20 +126,65 @@ document.addEventListener('DOMContentLoaded', () => {
   // Initialize application
   initializeApplication();
 
-  // Event Listeners
-  toggleSyncBtn.addEventListener('click', toggleSync);
-  settingsForm.addEventListener('submit', saveSettings);
-  clearLogsBtn.addEventListener('click', clearLogs);
-  exportLogsBtn.addEventListener('click', exportLogs);
-  refreshDevicesBtn.addEventListener('click', loadDevices);
-  retryDevicesBtn.addEventListener('click', loadDevices);
+  // Event Listeners - Using a more robust approach
+  if (toggleSyncBtn) {
+    toggleSyncBtn.addEventListener('click', (e) => {
+      console.log("Toggle sync button clicked");
+      e.preventDefault();
+      toggleSync();
+    });
+  }
 
-  // Socket events
-  socket.on('log', handleLogEvent);
+  if (settingsForm) {
+    settingsForm.addEventListener('submit', (e) => {
+      console.log("Settings form submitted");
+      e.preventDefault();
+      saveSettings(e);
+    });
+  }
+
+  if (clearLogsBtn) {
+    clearLogsBtn.addEventListener('click', (e) => {
+      console.log("Clear logs button clicked");
+      e.preventDefault();
+      clearLogs();
+    });
+  }
+
+  if (exportLogsBtn) {
+    exportLogsBtn.addEventListener('click', (e) => {
+      console.log("Export logs button clicked");
+      e.preventDefault();
+      exportLogs();
+    });
+  }
+
+  if (refreshDevicesBtn) {
+    refreshDevicesBtn.addEventListener('click', (e) => {
+      console.log("Refresh devices button clicked");
+      e.preventDefault();
+      loadDevices();
+    });
+  }
+
+  if (retryDevicesBtn) {
+    retryDevicesBtn.addEventListener('click', (e) => {
+      console.log("Retry devices button clicked");
+      e.preventDefault();
+      loadDevices();
+    });
+  }
+
+  // Socket events - only if socket is available
+  if (socket) {
+    socket.on('log', handleLogEvent);
+  }
 
   // Set up Electron IPC listeners if in Electron
   if (isElectron) {
+    console.log("Setting up Electron IPC listeners");
     window.api.receive('sync-status', (status) => {
+      console.log("Received sync status:", status);
       addLogEntry({
         timestamp: new Date().toISOString(),
         api: 'System',
@@ -109,6 +193,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     window.api.receive('sync-results', (results) => {
+      console.log("Received sync results:", results);
       if (Array.isArray(results)) {
         results.forEach(result => handleLogEvent(result));
       } else if (results) {
@@ -185,8 +270,20 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       // Use Electron IPC if available, otherwise use fetch
       if (isElectron) {
-        // In Electron, we would send a message to the main process
-        return { isRunning: false }; // Default for now
+        return new Promise((resolve) => {
+          // Set up one-time listener for the response
+          window.api.receive('sync-status-result', (result) => {
+            console.log("Received sync status result:", result);
+            resolve({
+              isRunning: result.isRunning || false,
+              lastSyncTime: result.lastSyncTime || new Date().toISOString(),
+              syncPeriod: result.syncPeriod || '5'
+            });
+          });
+
+          // Request sync status from main process
+          window.api.send('get-sync-status');
+        });
       } else {
         const statusResponse = await fetch('/api/sync/status');
         return await statusResponse.json();
@@ -529,43 +626,95 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function startCountdown() {
     try {
-      // Fetch the latest config with lastSyncTime
-      const response = await fetch('/api/sync/status');
-      const statusData = await response.json();
-      const lastSyncTime = new Date(statusData.lastSyncTime || new Date());
+      let lastSyncTime;
+      let periodMinutes;
 
-      // Get the sync period in minutes and convert to milliseconds
-      const periodMinutes = parseInt(syncPeriodSelect.value);
-      const periodMs = periodMinutes * 60 * 1000;
+      if (isElectron) {
+        // In Electron, get sync status via IPC
+        return new Promise((resolve) => {
+          // Set up listener for sync status result
+          window.api.receive('sync-status-result', (result) => {
+            console.log("Received sync status for countdown:", result);
 
-      // Calculate how much time has passed since last sync
-      const now = new Date();
-      const elapsedMs = now - lastSyncTime;
+            // Get values for the countdown
+            lastSyncTime = new Date(result.lastSyncTime || new Date());
+            periodMinutes = parseInt(result.syncPeriod || syncPeriodSelect.value);
 
-      // Calculate remaining time until next sync
-      let remainingMs = periodMs - (elapsedMs % periodMs);
-      if (remainingMs <= 0) {
-        remainingMs = periodMs; // If time has already passed, use full period
-      }
+            // Calculate countdown
+            const periodMs = periodMinutes * 60 * 1000;
+            const now = new Date();
+            const elapsedMs = now - lastSyncTime;
 
-      // Convert remaining time to seconds for countdown
-      countdown = Math.floor(remainingMs / 1000);
+            // Calculate remaining time until next sync
+            let remainingMs = periodMs - (elapsedMs % periodMs);
+            if (remainingMs <= 0) {
+              remainingMs = periodMs; // If time has already passed, use full period
+            }
 
-      // Update UI initially
-      updateCountdown();
+            // Convert remaining time to seconds for countdown
+            countdown = Math.floor(remainingMs / 1000);
 
-      // Clear any existing interval
-      stopCountdown();
+            // Update UI initially
+            updateCountdown();
 
-      // Start new interval
-      countdownInterval = setInterval(() => {
-        countdown--;
-        if (countdown <= 0) {
-          // Reset countdown for next cycle
-          countdown = periodMinutes * 60;
+            // Clear any existing interval
+            stopCountdown();
+
+            // Start new interval
+            countdownInterval = setInterval(() => {
+              countdown--;
+              if (countdown <= 0) {
+                // Reset countdown for next cycle
+                countdown = periodMinutes * 60;
+              }
+              updateCountdown();
+            }, 1000);
+
+            resolve();
+          });
+
+          // Request sync status from main process
+          window.api.send('get-sync-status');
+        });
+      } else {
+        // For web/server version, use fetch API
+        const response = await fetch('/api/sync/status');
+        const statusData = await response.json();
+        lastSyncTime = new Date(statusData.lastSyncTime || new Date());
+        periodMinutes = parseInt(syncPeriodSelect.value);
+
+        // Get the sync period in minutes and convert to milliseconds
+        const periodMs = periodMinutes * 60 * 1000;
+
+        // Calculate how much time has passed since last sync
+        const now = new Date();
+        const elapsedMs = now - lastSyncTime;
+
+        // Calculate remaining time until next sync
+        let remainingMs = periodMs - (elapsedMs % periodMs);
+        if (remainingMs <= 0) {
+          remainingMs = periodMs; // If time has already passed, use full period
         }
+
+        // Convert remaining time to seconds for countdown
+        countdown = Math.floor(remainingMs / 1000);
+
+        // Update UI initially
         updateCountdown();
-      }, 1000);
+
+        // Clear any existing interval
+        stopCountdown();
+
+        // Start new interval
+        countdownInterval = setInterval(() => {
+          countdown--;
+          if (countdown <= 0) {
+            // Reset countdown for next cycle
+            countdown = periodMinutes * 60;
+          }
+          updateCountdown();
+        }, 1000);
+      }
     } catch (error) {
       console.error('Error starting countdown:', error);
       // Fallback to original behavior if there's an error

@@ -2,15 +2,15 @@
   "auth": {
     "username": "admin",
     "password": "admin7445",
-    "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lkIjoxLCJ1c2VybmFtZSI6ImFkbWluIiwiZXhwIjoxNzQ2MzAxNTA2LCJlbWFpbCI6InJhZml1bGF3YWwyNEBnbWFpbC5jb20iLCJvcmlnX2lhdCI6MTc0NTY5NjcwNn0.t5ZRyxX3XPuLoFAqX4UULdxw4q5V3uWGXHHRYhE6lsI",
-    "lastLogin": "2025-04-26T19:45:12.303Z",
-    "tokenGeneratedAt": "2025-04-26T19:45:12.303Z"
+    "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lkIjoxLCJ1c2VybmFtZSI6ImFkbWluIiwiZXhwIjoxNzQ2MzEwNTc5LCJlbWFpbCI6InJhZml1bGF3YWwyNEBnbWFpbC5jb20iLCJvcmlnX2lhdCI6MTc0NTcwNTc3OX0.bQBYlHiH4UOaGg5FmHonv3VtOskEgRZTnlyzjLy21RY",
+    "lastLogin": "2025-04-26T22:16:25.498Z",
+    "tokenGeneratedAt": "2025-04-26T22:16:25.498Z"
   },
   "config": {
     "syncPeriod": "5",
-    "lastSyncTime": "2025-04-26T19:45:12.305Z",
+    "lastSyncTime": "2025-04-26T22:16:25.500Z",
     "serverUrl": "http://192.168.1.100:90",
-    "isRunning": false
+    "isRunning": true
   },
   "devices": [
     {
@@ -19,7 +19,7 @@
       "name": "Office",
       "companyId": "7cd486cc-d00c-42f9-a4be-98c29237e4c3",
       "ipAddress": "192.168.1.101",
-      "lastSeen": "2025-04-26T21:48:23.399Z"
+      "lastSeen": "2025-04-26T22:16:29.491Z"
     }
   ]
 }
