@@ -46,12 +46,21 @@ document.addEventListener('DOMContentLoaded', () => {
   const isElectron = window.api !== undefined;
   console.log("Running in Electron:", isElectron);
 
+  // Explicitly specify the backend URL for socket.io
+  const SOCKET_IO_URL = 'http://localhost:4000'; // Update this to the correct backend URL if needed
+
   // Socket.io connection - handle gracefully if not available
   let socket;
   try {
     if (typeof io !== 'undefined') {
-      socket = io();
-      console.log("Socket.io initialized");
+      socket = io(SOCKET_IO_URL); // Use the explicit backend URL
+      console.log("Socket.io initialized and connected to:", SOCKET_IO_URL);
+
+      // Add event listeners for logs
+      socket.on('log', handleLogEvent);
+      socket.on('connect_error', (error) => {
+        console.error("Socket.io connection error:", error);
+      });
     } else {
       console.log("Socket.io not available, running in standalone mode");
     }
