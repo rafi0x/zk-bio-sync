@@ -7,57 +7,29 @@ const router = express.Router();
 
 // Start sync
 router.post('/sync/start', async (req, res) => {
-  const { period, username, password, dryRun } = req.body;
+  try {
+    const { config: dbConfig } = await dbService.getConfig();
+    const dbAuth = await dbService.getAuthInfo();
 
-  // Handle dry run for settings validation
-  if (dryRun) {
-    try {
-      // Just attempt login to verify credentials
-      const loginResult = await apiService.login(username, password);
+    const period = dbConfig.syncPeriod;
+    const username = dbAuth.username;
+    const password = dbAuth.password;
+    const serverUrl = dbConfig.serverUrl;
 
-      if (loginResult.success) {
-        // If this is just to validate credentials, save the settings
-        await dbService.saveAuthInfo(username, password, loginResult.data.token);
-        await dbService.saveSyncPeriod(period);
-
-        return res.json({
-          success: true,
-          message: 'Credentials verified and settings saved',
-        });
-      } else {
-        return res.status(401).json({
-          success: false,
-          error: loginResult.error || 'Login failed',
-        });
-      }
-    } catch (error) {
-      return res.status(500).json({
+    if (!period || !username || !password || !serverUrl) {
+      return res.status(400).json({
         success: false,
-        error: error.message,
+        error: 'Missing required configuration or credentials in the database',
       });
     }
-  }
 
-  // Regular sync start
-  if (!period || !username || !password) {
-    return res.status(400).json({
+    const result = await syncService.startSync(period, { username, password, serverUrl }, req.app.get('io'));
+    res.json(result);
+  } catch (error) {
+    console.error('Error starting sync:', error);
+    res.status(500).json({
       success: false,
-      error: 'Missing required parameters',
-    });
-  }
-
-  const io = req.app.get('io');
-  const result = await syncService.startSync(period, { username, password }, io);
-
-  if (result.success) {
-    return res.json({
-      success: true,
-      message: `Sync started with ${period} minute interval`,
-    });
-  } else {
-    return res.status(401).json({
-      success: false,
-      error: result.error,
+      error: error.message || 'Failed to start sync',
     });
   }
 });
@@ -88,7 +60,7 @@ router.post('/sync/stop', async (req, res) => {
 // Get sync status
 router.get('/sync/status', async (req, res) => {
   const isRunning = await syncService.isRunning();
-  const config = await dbService.getConfig();
+  const { config } = await dbService.getConfig();
 
   return res.json({
     success: true,
@@ -104,9 +76,36 @@ router.get('/settings/credentials', async (req, res) => {
   return res.json({
     success: true,
     username: authInfo.username,
+    password: authInfo.password,
     hasCredentials: !!(authInfo.username && authInfo.password),
     lastLogin: authInfo.lastLogin
   });
+});
+
+// Save credentials
+router.post('/settings/credentials', async (req, res) => {
+  const { username, password } = req.body;
+
+  if (!username || !password) {
+    return res.status(400).json({
+      success: false,
+      error: 'Username and password are required'
+    });
+  }
+
+  try {
+    await dbService.saveAuthInfo(username, password, null);
+    return res.json({
+      success: true,
+      message: 'Credentials saved successfully'
+    });
+  } catch (error) {
+    console.error('Error saving credentials:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to save credentials'
+    });
+  }
 });
 
 // Get saved sync period
@@ -142,15 +141,35 @@ router.post('/settings/server', async (req, res) => {
 
   try {
     await dbService.saveServerUrl(url);
-
     return res.json({
       success: true,
-      message: 'Server URL updated'
+      message: 'Server URL updated successfully'
     });
   } catch (error) {
+    console.error('Error saving server URL:', error);
     return res.status(500).json({
       success: false,
-      error: error.message
+      error: error.message || 'Failed to save server URL'
+    });
+  }
+});
+
+// Get configuration settings
+router.get('/settings/config', async (req, res) => {
+  try {
+    const data = await dbService.getConfig();
+    res.json({
+      success: true,
+      syncPeriod: data.config.syncPeriod,
+      serverUrl: data.config.serverUrl,
+      username: data.auth.username,
+      password: data.auth.password
+    });
+  } catch (error) {
+    console.error('Error fetching configuration settings:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Failed to fetch configuration settings'
     });
   }
 });

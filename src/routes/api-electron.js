@@ -89,7 +89,7 @@ router.post('/sync/stop', async (req, res) => {
 // Get sync status
 router.get('/sync/status', async (req, res) => {
   const isRunning = await syncService.isRunning();
-  const config = await dbService.getConfig();
+  const { config } = await dbService.getConfig();
 
   return res.json({
     success: true,

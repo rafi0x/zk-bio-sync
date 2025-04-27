@@ -1,6 +1,9 @@
 document.addEventListener('DOMContentLoaded', () => {
   console.log("DOM Content Loaded - Initializing Application");
 
+  // Ensure API_BASE_URL is defined at the top of the file
+  const API_BASE_URL = 'http://localhost:4000'; // Update this to match your backend server
+
   // DOM Elements - Main UI
   const dashboardTab = document.getElementById('dashboard-tab');
   const settingsTab = document.getElementById('settings-tab');
@@ -212,7 +215,6 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Application Functions
-  const API_BASE_URL = 'http://localhost:4000'; // Ensure this matches your backend server
 
   async function initializeApplication() {
     try {
@@ -233,6 +235,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (settings.syncPeriod) {
           syncPeriodSelect.value = settings.syncPeriod;
         }
+        console.log("🚀 ~ initializeApplication ~ settings:", settings);
 
         // Check if settings are configured
         settingsConfigured = !!(settings.username && settings.password);
@@ -274,17 +277,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function fetchSettings() {
     try {
+      const configResponse = await fetch(`${API_BASE_URL}/api/settings/config`);
+      const configData = await configResponse.json();
+
       const credentialsResponse = await fetch(`${API_BASE_URL}/api/settings/credentials`);
       const credentialsData = await credentialsResponse.json();
 
-      const syncPeriodResponse = await fetch(`${API_BASE_URL}/api/settings/syncperiod`);
-      const syncPeriodData = await syncPeriodResponse.json();
+      console.log('Fetched config data:', configData);
+      console.log('Fetched credentials data:', credentialsData);
 
       return {
         username: credentialsData.username,
-        password: credentialsData.hasCredentials ? '********' : '',
-        syncPeriod: syncPeriodData.syncPeriod,
-        hasCredentials: credentialsData.hasCredentials,
+        password: credentialsData.password, // Fetch password from the database
+        syncPeriod: configData.syncPeriod,
+        serverUrl: configData.serverUrl, // Fetch serverUrl from the database
+        hasCredentials: !!(credentialsData.username && credentialsData.password),
         lastLogin: credentialsData.lastLogin
       };
     } catch (error) {
@@ -294,16 +301,25 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   async function fetchServerConfig() {
-    if (isElectron) {
-      // In Electron, we would send a message to the main process
-      return { url: 'http://192.168.1.100:90' }; // Default for now
-    } else {
-      // In a real app, this would fetch from the database via an API
-      return { url: 'http://192.168.1.100:90' };
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/settings/server`);
+      const data = await response.json();
+
+      if (data.success && data.url) {
+        return { url: data.url }; // Fetch serverUrl from the database
+      } else {
+        console.error('Failed to fetch server URL from the database:', data.error);
+        return { url: null };
+      }
+    } catch (error) {
+      console.error('Error fetching server URL:', error);
+      return { url: null };
     }
   }
 
   async function toggleSync() {
+    console.log('Toggle Sync clicked. Settings configured:', settingsConfigured);
+
     if (!settingsConfigured) {
       addLogEntry({
         timestamp: new Date().toISOString(),
@@ -325,7 +341,6 @@ document.addEventListener('DOMContentLoaded', () => {
   async function startSync() {
     try {
       const settings = await fetchSettings();
-      const password = passwordInput.value || 'admin7445';
 
       const response = await fetch(`${API_BASE_URL}/api/sync/start`, {
         method: 'POST',
@@ -333,9 +348,10 @@ document.addEventListener('DOMContentLoaded', () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          username: settings.username || usernameInput.value,
-          password: password,
-          period: settings.syncPeriod || syncPeriodSelect.value
+          username: settings.username,
+          password: settings.password, // Use password from the database
+          period: settings.syncPeriod,
+          serverUrl: settings.serverUrl // Use serverUrl from the database
         }),
       });
 
@@ -349,7 +365,7 @@ document.addEventListener('DOMContentLoaded', () => {
         addLogEntry({
           timestamp: new Date().toISOString(),
           api: 'System',
-          message: `Sync process started with ${settings.syncPeriod || syncPeriodSelect.value} minute interval`,
+          message: `Sync process started with ${settings.syncPeriod} minute interval`,
         });
       } else {
         addLogEntry({
@@ -422,73 +438,53 @@ document.addEventListener('DOMContentLoaded', () => {
     const period = syncPeriodSelect.value;
     const serverUrl = serverUrlInput.value;
 
-    if (!username || !password) {
+    if (!username || !password || !serverUrl) {
       addLogEntry({
         timestamp: new Date().toISOString(),
         api: 'System',
         success: false,
-        error: 'Username and password are required',
+        error: 'Username, password, and server URL are required',
       });
       return;
     }
 
     try {
-      // For a real implementation, we'd save server URL here too
-      console.log('Server URL would be saved:', serverUrl);
+      // Save credentials
+      const credentialsResponse = await fetch(`${API_BASE_URL}/api/settings/credentials`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ username, password }),
+      });
 
-      // If we're already running, stop the sync first
-      if (isRunning) {
-        await stopSync();
+      if (!credentialsResponse.ok) {
+        const errorData = await credentialsResponse.json();
+        throw new Error(errorData.error || 'Failed to save credentials');
       }
 
-      // Make a dummy login request to verify credentials
-      if (isElectron) {
-        // In Electron, we would send credentials to the main process
-        settingsConfigured = true;
+      // Save server URL
+      const serverResponse = await fetch(`${API_BASE_URL}/api/settings/server`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ url: serverUrl }),
+      });
 
-        addLogEntry({
-          timestamp: new Date().toISOString(),
-          api: 'System',
-          message: 'Settings saved successfully',
-        });
-
-        // Switch back to dashboard
-        switchTab('dashboard');
-      } else {
-        const loginResponse = await fetch('/api/sync/start', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            username,
-            password,
-            period,
-            dryRun: true // Indicate this is just a test
-          }),
-        });
-
-        if (loginResponse.ok) {
-          settingsConfigured = true;
-
-          addLogEntry({
-            timestamp: new Date().toISOString(),
-            api: 'System',
-            message: 'Settings saved successfully',
-          });
-
-          // Switch back to dashboard
-          switchTab('dashboard');
-        } else {
-          const data = await loginResponse.json();
-          addLogEntry({
-            timestamp: new Date().toISOString(),
-            api: 'System',
-            success: false,
-            error: data.error || 'Invalid credentials',
-          });
-        }
+      if (!serverResponse.ok) {
+        const errorData = await serverResponse.json();
+        throw new Error(errorData.error || 'Failed to save server URL');
       }
+
+      addLogEntry({
+        timestamp: new Date().toISOString(),
+        api: 'System',
+        message: 'Settings saved successfully',
+      });
+
+      // Switch back to dashboard
+      switchTab('dashboard');
     } catch (error) {
       addLogEntry({
         timestamp: new Date().toISOString(),

@@ -16,7 +16,7 @@ class SyncService {
     try {
       console.log('[SyncService] Initializing from database...');
       // Load configuration from database
-      const config = await dbService.getConfig();
+      const { config } = await dbService.getConfig();
       console.log('[SyncService] Config:', config);
 
       // Always start the sync process during initialization
@@ -111,7 +111,8 @@ class SyncService {
   async isRunning() {
     // Get both memory and database states
     const memoryRunning = this.intervalId !== null;
-    const dbRunning = (await dbService.getConfig()).isRunning;
+    const { config } = await dbService.getConfig();
+    const dbRunning = config.isRunning;
 
     // If there's a mismatch, update the database to match the actual state
     if (dbRunning !== memoryRunning) {
@@ -126,7 +127,7 @@ class SyncService {
   }
 
   async getSavedSyncPeriod() {
-    const config = await dbService.getConfig();
+    const { config } = await dbService.getConfig();
     return config.syncPeriod || '5';
   }
 
@@ -165,7 +166,7 @@ class SyncService {
    * @returns {Promise<Object>} Configuration object
    */
   async getConfig() {
-    const config = await dbService.getConfig();
+    const { config } = await dbService.getConfig();
     const isRunning = await this.isRunning();
     return {
       ...config,

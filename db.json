@@ -1,16 +1,16 @@
 {
   "auth": {
-    "username": "",
-    "password": "",
-    "token": "",
-    "lastLogin": "2025-04-27T07:11:34.911Z",
-    "tokenGeneratedAt": "2025-04-27T07:11:34.911Z"
+    "username": "admin",
+    "password": "admin",
+    "token": null,
+    "lastLogin": "2025-04-27T19:23:02.651Z",
+    "tokenGeneratedAt": "2025-04-27T19:23:02.651Z"
   },
   "config": {
     "syncPeriod": "5",
-    "lastSyncTime": "2025-04-27T07:11:34.913Z",
-    "serverUrl": "",
-    "isRunning": true
+    "lastSyncTime": "2025-04-27T20:30:36.981Z",
+    "serverUrl": "http://192.168.1.110:90",
+    "isRunning": false
   },
   "devices": []
 }

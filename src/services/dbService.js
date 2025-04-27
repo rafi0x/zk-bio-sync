@@ -169,16 +169,17 @@ class DbService {
   async getConfig() {
     await this.init();
     // Ensure lastSyncTime is a valid ISO string
+    console.log("🚀 ~ DbService ~ getConfig ~ db.data.config:", db.data.config);
     if (!db.data.config.lastSyncTime || isNaN(Date.parse(db.data.config.lastSyncTime))) {
       db.data.config.lastSyncTime = new Date().toISOString();
       await this.saveData();
     }
-    return db.data.config;
+    return db.data
   }
 
   async getServerUrl() {
     await this.init();
-    return db.data.config.serverUrl || 'http://192.168.1.100:90';
+    return db.data.config.serverUrl;
   }
 
   async saveServerUrl(url) {
