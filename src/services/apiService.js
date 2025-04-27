@@ -1,5 +1,17 @@
 const axios = require('axios');
 const dbService = require('./dbService.js');
+const https = require('https');
+const dns = require('dns');
+const { Resolver } = require('dns');
+
+// Use a custom DNS resolver (e.g., Google's public DNS)
+const resolver = new Resolver();
+resolver.setServers(['8.8.8.8', '8.8.4.4']);
+
+// Create a custom HTTPS agent to use the custom resolver
+const customAgent = new https.Agent({
+  lookup: (hostname, options, callback) => resolver.resolve4(hostname, callback),
+});
 
 class ApiService {
   constructor () {
@@ -60,18 +72,66 @@ class ApiService {
   async login(username, password) {
     try {
       await this.init(); // Ensure we have the latest server URL
+      
+      // Add debug logging
+      console.log(`[ApiService] Attempting login to ${this.baseUrl} with username: ${username}`);
+      
+      if (!username || !password) {
+        console.error('[ApiService] Login failed: Missing username or password');
+        return { 
+          success: false, 
+          error: 'Username or password is missing' 
+        };
+      }
+
+      if (!this.baseUrl || this.baseUrl.trim() === '') {
+        console.error('[ApiService] Login failed: Invalid server URL');
+        return { 
+          success: false, 
+          error: 'Invalid server URL. Please check your server settings.' 
+        };
+      }
+
       const response = await axios.post(`${this.baseUrl}/jwt-api-token-auth/`, {
         username,
         password,
       });
-      this.token = response.data.token;
+      
+      if (!response.data || !response.data.token) {
+        console.error('[ApiService] Login failed: Response missing token', response.data);
+        return { 
+          success: false, 
+          error: 'Invalid response from server (missing token)'
+        };
+      }
 
-      // Save credentials and token to database
+      this.token = response.data.token;
+      console.log(`[ApiService] Login successful, token received`);
+
+      // Save credentials and token to database with timestamp
       await dbService.saveAuthInfo(username, password, this.token);
       return { success: true, data: response.data };
     } catch (error) {
-      console.error('Login failed:', error.message);
-      return { success: false, error: error.message };
+      // Enhanced error logging
+      console.error('[ApiService] Login failed details:', {
+        message: error.message,
+        url: `${this.baseUrl}/jwt-api-token-auth/`,
+        responseData: error.response?.data,
+        status: error.response?.status
+      });
+      
+      let errorMsg = error.message;
+      
+      // Handle specific error types more gracefully
+      if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
+        errorMsg = `Cannot connect to server at ${this.baseUrl}. Please check your server settings and network connection.`;
+      } else if (error.response && error.response.status === 401) {
+        errorMsg = 'Incorrect username or password';
+      } else if (error.response && error.response.status === 404) {
+        errorMsg = `API endpoint not found at ${this.baseUrl}/jwt-api-token-auth/. Please check your server URL.`;
+      }
+      
+      return { success: false, error: errorMsg };
     }
   }
 
@@ -226,16 +286,27 @@ class ApiService {
         key: "myFingerGoesClickBangClackBang"
       };
 
-      const response = await axios.post('https://api-staging.easterncorporation.net/api/v1/attendances/import-device-data', payload, {
+      // Explicitly use the URL for this API call
+      const externalApiUrl = 'https://api-staging.easterncorporation.net/api/v1/attendances/import-device-data';
+
+      const response = await fetch(externalApiUrl, {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json'
-        }
+        },
+        body: JSON.stringify(payload),
       });
 
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
       return {
         success: true,
         message: 'Data sent successfully to external API',
-        data: response.data
+        data: data
       };
     } catch (error) {
       console.error('Failed to send data to external API:', error.message);
@@ -291,6 +362,7 @@ class ApiService {
       success: logsResult.success,
       error: logsResult.error,
     });
+    
 
     // If all data fetches were successful, send to external API
     if (employeesResult.success && logsResult.success) {

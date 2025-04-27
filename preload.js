@@ -2,46 +2,35 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
-contextBridge.exposeInMainWorld(
-  'api',
-  {
-    send: (channel, data) => {
-      // whitelist channels
-      let validChannels = [
-        'sync-now',
-        'stop-sync',
-        'get-sync-status',
-        'get-settings',
-        'save-settings',
-        'get-devices'
-      ];
-
-      if (validChannels.includes(channel)) {
-        ipcRenderer.send(channel, data);
-      }
-    },
-    receive: (channel, func) => {
-      let validChannels = [
-        'sync-status',
-        'sync-status-result',
-        'sync-results',
-        'settings',
-        'settings-saved',
-        'devices-result'
-      ];
-
-      if (validChannels.includes(channel)) {
-        // Remove any existing listeners for this channel to prevent duplicates
-        ipcRenderer.removeAllListeners(channel);
-
-        // Deliberately strip event as it includes `sender` 
-        ipcRenderer.on(channel, (event, ...args) => func(...args));
-      }
-    },
-    // Add a way to check if the API is available
-    isAvailable: true
+contextBridge.exposeInMainWorld('api', {
+  send: (channel, data) => {
+    const validChannels = [
+      'sync-now',
+      'stop-sync',
+      'get-sync-status',
+      'get-settings',
+      'save-settings',
+      'get-devices'
+    ];
+    if (validChannels.includes(channel)) {
+      ipcRenderer.send(channel, data);
+    }
+  },
+  receive: (channel, callback) => {
+    const validChannels = [
+      'sync-status',
+      'sync-status-result',
+      'sync-results',
+      'settings',
+      'settings-saved',
+      'devices-result'
+    ];
+    if (validChannels.includes(channel)) {
+      ipcRenderer.removeAllListeners(channel); // Prevent duplicate listeners
+      ipcRenderer.on(channel, (event, ...args) => callback(...args));
+    }
   }
-);
+});
 
 // Fix for scrolling in Electron
 window.addEventListener('DOMContentLoaded', () => {

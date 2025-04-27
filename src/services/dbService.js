@@ -90,6 +90,21 @@ class DbService {
             await db.write();
           }
 
+          // Validate and correct invalid dates
+          if (db.data.auth.tokenGeneratedAt && isNaN(Date.parse(db.data.auth.tokenGeneratedAt))) {
+            console.warn('[dbService] Invalid tokenGeneratedAt, resetting to null');
+            db.data.auth.tokenGeneratedAt = null;
+          }
+          if (db.data.auth.lastLogin && isNaN(Date.parse(db.data.auth.lastLogin))) {
+            console.warn('[dbService] Invalid lastLogin, resetting to null');
+            db.data.auth.lastLogin = null;
+          }
+          if (db.data.config.lastSyncTime && isNaN(Date.parse(db.data.config.lastSyncTime))) {
+            console.warn('[dbService] Invalid lastSyncTime, resetting to null');
+            db.data.config.lastSyncTime = null;
+          }
+
+          await db.write();
           this.initialized = true;
           console.log('Database initialized:', dbFilePath);
         } catch (error) {
@@ -121,11 +136,12 @@ class DbService {
 
   async saveAuthInfo(username, password, token) {
     await this.init();
+    const now = new Date();
     db.data.auth.username = username;
     db.data.auth.password = password;
     db.data.auth.token = token;
-    db.data.auth.tokenGeneratedAt = new Date().toISOString(); // Store token generation time
-    db.data.auth.lastLogin = new Date().toISOString();
+    db.data.auth.tokenGeneratedAt = now.toISOString();
+    db.data.auth.lastLogin = now.toISOString();
     await this.saveData();
     return db.data.auth;
   }
@@ -133,7 +149,13 @@ class DbService {
   async updateToken(token) {
     await this.init();
     db.data.auth.token = token;
-    db.data.auth.tokenGeneratedAt = new Date().toISOString(); // Update token generation time
+    try {
+      const now = new Date();
+      db.data.auth.tokenGeneratedAt = now.toISOString();
+    } catch (err) {
+      console.error('Error setting date in updateToken:', err);
+      db.data.auth.tokenGeneratedAt = new Date(Date.now()).toISOString();
+    }
     await this.saveData();
   }
 
@@ -146,6 +168,11 @@ class DbService {
   // Configuration Methods
   async getConfig() {
     await this.init();
+    // Ensure lastSyncTime is a valid ISO string
+    if (!db.data.config.lastSyncTime || isNaN(Date.parse(db.data.config.lastSyncTime))) {
+      db.data.config.lastSyncTime = new Date().toISOString();
+      await this.saveData();
+    }
     return db.data.config;
   }
 

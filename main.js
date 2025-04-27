@@ -50,58 +50,38 @@ function createWindow() {
     width: 500,
     height: 800,
     webPreferences: {
-      nodeIntegration: false,
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.js'),
-      devTools: true // Always enable DevTools
+      devTools: false
     },
     icon: path.join(__dirname, 'public', 'icon.png'),
     autoHideMenuBar: true,
-    show: false // Start hidden
+    show: false,
   });
+
+  console.log('[Electron] Creating main window');
 
   // Load the app
   if (app.isPackaged) {
     const indexPath = path.join(__dirname, 'public', 'index.html');
-    mainWindow.loadURL(url.format({
-      pathname: indexPath,
-      protocol: 'file:',
-      slashes: true
-    }));
-
-    // For debugging production build
-    mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
-      console.error('Failed to load:', errorCode, errorDescription);
-    });
+    console.log(`[Electron] Loading packaged app from ${indexPath}`);
+    mainWindow.loadFile(indexPath);
   } else {
+    console.log('[Electron] Loading development app from http://localhost:4000');
     mainWindow.loadURL('http://localhost:4000');
   }
 
-  // Open DevTools in a separate window (detached)
-  if (!app.isPackaged) {
-  }
-  mainWindow.webContents.openDevTools({ mode: 'detach' });
-
-  Menu.setApplicationMenu(null);
-
   mainWindow.once('ready-to-show', () => {
+    console.log('[Electron] Main window ready to show');
     mainWindow.show();
-
-    // For debugging - uncomment to open DevTools in production
-    // if (app.isPackaged) {
-    //   mainWindow.webContents.openDevTools();
-    // }
-  });
-
-  mainWindow.on('close', (event) => {
-    if (!app.isQuiting) {
-      event.preventDefault();
-      mainWindow.hide();
-    }
-    return false;
+    // setTimeout(() => {
+    //   console.log('[Electron] Opening DevTools');
+    //   mainWindow.webContents.openDevTools({ mode: 'detach' });
+    // }, 500);
   });
 
   mainWindow.on('closed', () => {
+    console.log('[Electron] Main window closed');
     mainWindow = null;
   });
 }
@@ -202,10 +182,9 @@ function setupIpcHandlers() {
         lastLogin: authInfo.lastLogin
       });
     } catch (error) {
-      mainWindow.webContents.send('sync-results', {
+      console.error('[Electron] Error getting settings:', error);
+      mainWindow.webContents.send('settings', {
         success: false,
-        api: 'Settings',
-        timestamp: new Date().toISOString(),
         error: error.message || 'Failed to get settings'
       });
     }
@@ -213,6 +192,14 @@ function setupIpcHandlers() {
 
   ipcMain.on('save-settings', async (event, data) => {
     try {
+      // Log the settings being saved
+      console.log('[Electron] Saving settings:', { 
+        username: data.username, 
+        password: data.password ? '********' : 'not provided',
+        period: data.period,
+        serverUrl: data.serverUrl
+      });
+      
       if (data.username && data.password) {
         await syncService.saveCredentials(data.username, data.password);
       }
@@ -223,12 +210,16 @@ function setupIpcHandlers() {
 
       if (data.serverUrl) {
         await syncService.saveServerUrl(data.serverUrl);
+        // Update the API service with the new URL
+        await apiService.init();
       }
 
+      // Send a successful response
       mainWindow.webContents.send('settings-saved', {
         success: true
       });
     } catch (error) {
+      console.error('[Electron] Error saving settings:', error);
       mainWindow.webContents.send('settings-saved', {
         success: false,
         error: error.message || 'Failed to save settings'
@@ -238,11 +229,13 @@ function setupIpcHandlers() {
 
   ipcMain.on('get-devices', async (event) => {
     try {
+      console.log('[Electron] Fetching devices...');
       // First check if we have credentials and a token
       const authInfo = await syncService.getSavedCredentials();
 
       if (!authInfo || !authInfo.username || !authInfo.password) {
         // No valid credentials
+        console.error('[Electron] No credentials for device fetch');
         mainWindow.webContents.send('devices-result', {
           success: false,
           error: 'No valid credentials found. Please configure your settings first.'
@@ -251,10 +244,13 @@ function setupIpcHandlers() {
       }
 
       // Try to get devices with proper error handling
+      console.log('[Electron] Calling apiService.getDevices()');
       const response = await apiService.getDevices();
+      console.log('[Electron] Device API response:', response);
 
       if (!response.success) {
         // API call failed - send the error
+        console.error('[Electron] Failed to fetch devices:', response.error);
         mainWindow.webContents.send('devices-result', {
           success: false,
           error: response.error || 'Failed to fetch devices from the server'
@@ -265,6 +261,7 @@ function setupIpcHandlers() {
       // We have devices data, format it
       try {
         const devices = await formatDeviceData(response);
+        console.log('[Electron] Formatted device data:', devices);
         mainWindow.webContents.send('devices-result', {
           success: true,
           devices: devices || []

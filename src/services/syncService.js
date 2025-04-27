@@ -137,24 +137,47 @@ class SyncService {
     return config.syncPeriod || '5';
   }
 
-  // Add the missing getConfig method
-  async getConfig() {
-    return await dbService.getConfig();
-  }
-
-  // Add getServerUrl method
+  /**
+   * Get server URL from the database
+   * @returns {Promise<string>} The server URL
+   */
   async getServerUrl() {
     return await dbService.getServerUrl();
   }
 
-  // Add saveCredentials method
-  async saveCredentials(username, password) {
-    return await dbService.saveAuthInfo(username, password, null);
-  }
-
-  // Add saveServerUrl method
+  /**
+   * Save server URL to the database
+   * @param {string} url - The server URL to save
+   * @returns {Promise<void>}
+   */
   async saveServerUrl(url) {
     return await dbService.saveServerUrl(url);
+  }
+
+  /**
+   * Save credentials directly (for Electron IPC)
+   * @param {string} username - Username to save
+   * @param {string} password - Password to save
+   * @returns {Promise<void>}
+   */
+  async saveCredentials(username, password) {
+    // Get current auth info to preserve the token if it exists
+    const authInfo = await dbService.getAuthInfo();
+    const token = authInfo ? authInfo.token : null;
+    return await dbService.saveAuthInfo(username, password, token);
+  }
+
+  /**
+   * Get configuration info including sync status
+   * @returns {Promise<Object>} Configuration object
+   */
+  async getConfig() {
+    const config = await dbService.getConfig();
+    const isRunning = await this.isRunning();
+    return {
+      ...config,
+      isRunning
+    };
   }
 }
 

@@ -203,6 +203,8 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Application Functions
+  const API_BASE_URL = 'http://localhost:4000'; // Ensure this matches your backend server
+
   async function initializeApplication() {
     try {
       // Load saved server URL if available
@@ -268,26 +270,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function fetchSyncStatus() {
     try {
-      // Use Electron IPC if available, otherwise use fetch
-      if (isElectron) {
-        return new Promise((resolve) => {
-          // Set up one-time listener for the response
-          window.api.receive('sync-status-result', (result) => {
-            console.log("Received sync status result:", result);
-            resolve({
-              isRunning: result.isRunning || false,
-              lastSyncTime: result.lastSyncTime || new Date().toISOString(),
-              syncPeriod: result.syncPeriod || '5'
-            });
-          });
-
-          // Request sync status from main process
-          window.api.send('get-sync-status');
-        });
-      } else {
-        const statusResponse = await fetch('/api/sync/status');
-        return await statusResponse.json();
-      }
+      const response = await fetch(`${API_BASE_URL}/api/sync/status`);
+      return await response.json();
     } catch (error) {
       console.error('Error fetching sync status:', error);
       return { isRunning: false };
@@ -296,32 +280,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function fetchSettings() {
     try {
-      if (isElectron) {
-        // In Electron, we would send a message to the main process
-        // For now, return default values as placeholder
-        return {
-          username: 'admin',
-          password: '********',
-          syncPeriod: '5',
-          hasCredentials: true
-        };
-      } else {
-        // Load saved credentials
-        const credentialsResponse = await fetch('/api/settings/credentials');
-        const credentialsData = await credentialsResponse.json();
+      const credentialsResponse = await fetch(`${API_BASE_URL}/api/settings/credentials`);
+      const credentialsData = await credentialsResponse.json();
 
-        // Load saved sync period
-        const syncPeriodResponse = await fetch('/api/settings/syncperiod');
-        const syncPeriodData = await syncPeriodResponse.json();
+      const syncPeriodResponse = await fetch(`${API_BASE_URL}/api/settings/syncperiod`);
+      const syncPeriodData = await syncPeriodResponse.json();
 
-        return {
-          username: credentialsData.username,
-          password: credentialsData.hasCredentials ? '********' : '',
-          syncPeriod: syncPeriodData.syncPeriod,
-          hasCredentials: credentialsData.hasCredentials,
-          lastLogin: credentialsData.lastLogin
-        };
-      }
+      return {
+        username: credentialsData.username,
+        password: credentialsData.hasCredentials ? '********' : '',
+        syncPeriod: syncPeriodData.syncPeriod,
+        hasCredentials: credentialsData.hasCredentials,
+        lastLogin: credentialsData.lastLogin
+      };
     } catch (error) {
       console.error('Error fetching settings:', error);
       return null;
@@ -359,21 +330,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function startSync() {
     try {
-      // Get settings for sync
       const settings = await fetchSettings();
+      const password = passwordInput.value || 'admin7445';
 
-      // Fetch the actual password from settings (not the masked one)
-      let password = passwordInput.value;
-      if (!password || password === '********') {
-        // If we don't have a new password, use the saved one
-        password = 'admin7445'; // Default from postman collection for demo
-      }
+      const response = await fetch(`${API_BASE_URL}/api/sync/start`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username: settings.username || usernameInput.value,
+          password: password,
+          period: settings.syncPeriod || syncPeriodSelect.value
+        }),
+      });
 
-      // Use Electron IPC if available, otherwise use fetch
-      if (isElectron) {
-        // Trigger sync in main process via IPC
-        window.api.send('sync-now');
+      const data = await response.json();
 
+      if (response.ok) {
         isRunning = true;
         updateSyncUI(true);
         startCountdown();
@@ -384,45 +358,19 @@ document.addEventListener('DOMContentLoaded', () => {
           message: `Sync process started with ${settings.syncPeriod || syncPeriodSelect.value} minute interval`,
         });
       } else {
-        const response = await fetch('/api/sync/start', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            username: settings.username || usernameInput.value,
-            password: password,
-            period: settings.syncPeriod || syncPeriodSelect.value
-          }),
+        addLogEntry({
+          timestamp: new Date().toISOString(),
+          api: 'System',
+          success: false,
+          error: data.error || 'Failed to start sync',
         });
-
-        const data = await response.json();
-
-        if (response.ok) {
-          isRunning = true;
-          updateSyncUI(true);
-          startCountdown();
-
-          addLogEntry({
-            timestamp: new Date().toISOString(),
-            api: 'System',
-            message: `Sync process started with ${settings.syncPeriod || syncPeriodSelect.value} minute interval`,
-          });
-        } else {
-          addLogEntry({
-            timestamp: new Date().toISOString(),
-            api: 'System',
-            success: false,
-            error: data.error || 'Failed to start sync',
-          });
-        }
       }
     } catch (error) {
       addLogEntry({
         timestamp: new Date().toISOString(),
         api: 'System',
         success: false,
-        error: `Error: ${error.message}`,
+        error: `Error: ${error.message || 'Unknown error'}`,
       });
     }
   }
