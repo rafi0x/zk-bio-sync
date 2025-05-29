@@ -6,7 +6,7 @@ const { Resolver } = require('dns');
 
 // Use a custom DNS resolver (e.g., Google's public DNS)
 const resolver = new Resolver();
-resolver.setServers(['8.8.8.8', '8.8.4.4']);
+resolver.setServers([ '8.8.8.8', '8.8.4.4' ]);
 
 // Create a custom HTTPS agent to use the custom resolver
 const customAgent = new https.Agent({
@@ -72,23 +72,20 @@ class ApiService {
   async login(username, password) {
     try {
       await this.init(); // Ensure we have the latest server URL
-      
-      // Add debug logging
-      console.log(`[ApiService] Attempting login to ${this.baseUrl} with username: ${username}`);
-      
+
       if (!username || !password) {
         console.error('[ApiService] Login failed: Missing username or password');
-        return { 
-          success: false, 
-          error: 'Username or password is missing' 
+        return {
+          success: false,
+          error: 'Username or password is missing'
         };
       }
 
       if (!this.baseUrl || this.baseUrl.trim() === '') {
         console.error('[ApiService] Login failed: Invalid server URL');
-        return { 
-          success: false, 
-          error: 'Invalid server URL. Please check your server settings.' 
+        return {
+          success: false,
+          error: 'Invalid server URL. Please check your server settings.'
         };
       }
 
@@ -96,17 +93,16 @@ class ApiService {
         username,
         password,
       });
-      
+
       if (!response.data || !response.data.token) {
         console.error('[ApiService] Login failed: Response missing token', response.data);
-        return { 
-          success: false, 
+        return {
+          success: false,
           error: 'Invalid response from server (missing token)'
         };
       }
 
       this.token = response.data.token;
-      console.log(`[ApiService] Login successful, token received`);
 
       // Save credentials and token to database with timestamp
       await dbService.saveAuthInfo(username, password, this.token);
@@ -119,9 +115,9 @@ class ApiService {
         responseData: error.response?.data,
         status: error.response?.status
       });
-      
+
       let errorMsg = error.message;
-      
+
       // Handle specific error types more gracefully
       if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
         errorMsg = `Cannot connect to server at ${this.baseUrl}. Please check your server settings and network connection.`;
@@ -130,7 +126,7 @@ class ApiService {
       } else if (error.response && error.response.status === 404) {
         errorMsg = `API endpoint not found at ${this.baseUrl}/jwt-api-token-auth/. Please check your server URL.`;
       }
-      
+
       return { success: false, error: errorMsg };
     }
   }
@@ -172,11 +168,11 @@ class ApiService {
 
         // Create a map for easy lookup
         storedDevices.forEach(device => {
-          storedDevicesMap.set(device.id.toString(), device);
+          storedDevicesMap.set(device.ip_address, device);
         });
 
         const devices = response.data.data.map(device => {
-          const storedDevice = storedDevicesMap.get(device.id.toString());
+          const storedDevice = storedDevicesMap.get(device.ip_address);
           return {
             id: device.id, // Serial number as ID
             serialNumber: device.sn,
@@ -250,7 +246,7 @@ class ApiService {
     });
   }
 
-  async getDeviceLogs() {
+  async getDeviceLogsOfToday() {
     try {
       await this.init();
 
@@ -259,6 +255,25 @@ class ApiService {
 
       const response = await axios.get(
         `${this.baseUrl}/iclock/api/transactions/?page_size=1000&start_time=${currentDate}`,
+        {
+          headers: this.getAuthHeaders(),
+        }
+      );
+
+      // Transform the response data before returning
+      const transformedData = await this.transformDeviceLogs(response.data);
+      return { success: true, rawData: response.data, data: transformedData };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  async getDeviceLogsAll() {
+    try {
+      await this.init();
+
+      const response = await axios.get(
+        `${this.baseUrl}/iclock/api/transactions/?page_size=10000000`,
         {
           headers: this.getAuthHeaders(),
         }
@@ -302,7 +317,7 @@ class ApiService {
       }
 
       const data = await response.json();
-      
+
       return {
         success: true,
         message: 'Data sent successfully to external API',
@@ -355,14 +370,14 @@ class ApiService {
     });
 
     // Get device logs
-    const logsResult = await this.getDeviceLogs();
+    const logsResult = await this.getDeviceLogsOfToday();
     results.push({
       timestamp,
       api: 'Device Logs',
       success: logsResult.success,
       error: logsResult.error,
     });
-    
+
 
     // If all data fetches were successful, send to external API
     if (employeesResult.success && logsResult.success) {

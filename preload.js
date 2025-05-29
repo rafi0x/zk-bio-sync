@@ -29,12 +29,12 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.removeAllListeners(channel); // Prevent duplicate listeners
       ipcRenderer.on(channel, (event, ...args) => callback(...args));
     }
-  }
+  },
+  // fetchSettings: () => ipcRenderer.invoke('fetch-settings')
 });
 
 // Fix for scrolling in Electron
 window.addEventListener('DOMContentLoaded', () => {
-  console.log("Preload script loaded, setting up event listeners for scrolling");
 
   // Add event listeners to enable scrolling in all scrollable containers
   document.querySelectorAll('.scroll-container').forEach(container => {

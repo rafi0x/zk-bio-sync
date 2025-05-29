@@ -12,7 +12,6 @@ if (process.type === 'renderer' || process.versions.electron) {
 
   if (userDataPath) {
     dbFilePath = path.join(userDataPath, 'db.json');
-    console.log('Using Electron userData path for database:', dbFilePath);
   } else {
     // Fallback if app is not available
     dbFilePath = path.join(__dirname, '../../db.json');
@@ -80,12 +79,10 @@ class DbService {
             await db.read();
             // Check if data structure is valid
             if (!db.data || typeof db.data !== 'object') {
-              console.log('Database file exists but structure is invalid, resetting to default');
               db.data = { ...defaultData };
               await db.write();
             }
           } catch (readError) {
-            console.log('Database file does not exist or is corrupt, creating new one');
             db.data = { ...defaultData };
             await db.write();
           }
@@ -106,7 +103,6 @@ class DbService {
 
           await db.write();
           this.initialized = true;
-          console.log('Database initialized:', dbFilePath);
         } catch (error) {
           console.error('Error initializing database:', error);
         }
@@ -169,7 +165,6 @@ class DbService {
   async getConfig() {
     await this.init();
     // Ensure lastSyncTime is a valid ISO string
-    console.log("🚀 ~ DbService ~ getConfig ~ db.data.config:", db.data.config);
     if (!db.data.config.lastSyncTime || isNaN(Date.parse(db.data.config.lastSyncTime))) {
       db.data.config.lastSyncTime = new Date().toISOString();
       await this.saveData();

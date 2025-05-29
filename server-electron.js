@@ -23,9 +23,9 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.set('io', io);
 
 // Import routes using CommonJS style
-const apiRoutes = require('./src/routes/api-electron.js');
+const apiRoutes = require('./src/routes/api.js');
 
-// API routes
+// Register API routes
 app.use('/api', apiRoutes);
 
 // Socket.io connection

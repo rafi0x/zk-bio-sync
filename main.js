@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, Menu, Tray } = require('electron');
 const path = require('path');
 const url = require('url');
 const AutoLaunch = require('auto-launch');
+const axios = require('axios');
 
 const apiService = require('./src/services/apiService.js');
 const syncService = require('./src/services/syncService.js');
@@ -52,36 +53,29 @@ function createWindow() {
     webPreferences: {
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.js'),
-      devTools: false
+      devTools: true
     },
     icon: path.join(__dirname, 'public', 'icon.png'),
     autoHideMenuBar: true,
     show: false,
   });
 
-  console.log('[Electron] Creating main window');
-
   // Load the app
   if (app.isPackaged) {
     const indexPath = path.join(__dirname, 'public', 'index.html');
-    console.log(`[Electron] Loading packaged app from ${indexPath}`);
     mainWindow.loadFile(indexPath);
   } else {
-    console.log('[Electron] Loading development app from http://localhost:4000');
     mainWindow.loadURL('http://localhost:4000');
   }
 
   mainWindow.once('ready-to-show', () => {
-    console.log('[Electron] Main window ready to show');
     mainWindow.show();
     // setTimeout(() => {
-    //   console.log('[Electron] Opening DevTools');
     //   mainWindow.webContents.openDevTools({ mode: 'detach' });
     // }, 500);
   });
 
   mainWindow.on('closed', () => {
-    console.log('[Electron] Main window closed');
     mainWindow = null;
   });
 
@@ -185,7 +179,7 @@ function setupIpcHandlers() {
 
       mainWindow.webContents.send('settings', {
         username: authInfo.username,
-        password: authInfo.password ? '********' : '',
+        password: authInfo.password,
         syncPeriod: syncPeriod,
         serverUrl: serverUrl,
         hasCredentials: !!(authInfo.username && authInfo.password),
@@ -202,14 +196,6 @@ function setupIpcHandlers() {
 
   ipcMain.on('save-settings', async (event, data) => {
     try {
-      // Log the settings being saved
-      console.log('[Electron] Saving settings:', {
-        username: data.username,
-        password: data.password ? '********' : 'not provided',
-        period: data.period,
-        serverUrl: data.serverUrl
-      });
-
       if (data.username && data.password) {
         await syncService.saveCredentials(data.username, data.password);
       }
@@ -239,7 +225,6 @@ function setupIpcHandlers() {
 
   ipcMain.on('get-devices', async (event) => {
     try {
-      console.log('[Electron] Fetching devices...');
       // First check if we have credentials and a token
       const authInfo = await syncService.getSavedCredentials();
 
@@ -254,9 +239,7 @@ function setupIpcHandlers() {
       }
 
       // Try to get devices with proper error handling
-      console.log('[Electron] Calling apiService.getDevices()');
       const response = await apiService.getDevices();
-      console.log('[Electron] Device API response:', response);
 
       if (!response.success) {
         // API call failed - send the error
@@ -271,7 +254,6 @@ function setupIpcHandlers() {
       // We have devices data, format it
       try {
         const devices = await formatDeviceData(response);
-        console.log('[Electron] Formatted device data:', devices);
         mainWindow.webContents.send('devices-result', {
           success: true,
           devices: devices || []
@@ -291,4 +273,14 @@ function setupIpcHandlers() {
       });
     }
   });
+
+  // ipcMain.handle('fetch-settings', async () => {
+  //   try {
+  //     const response = await axios.get('http://localhost:4000/api/settings/config');
+  //     return response.data;
+  //   } catch (error) {
+  //     console.error('Error fetching settings:', error);
+  //     throw error;
+  //   }
+  // });
 }

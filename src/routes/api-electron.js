@@ -209,4 +209,30 @@ router.post('/devices/:deviceId/company', async (req, res) => {
   }
 });
 
+// Sync all device logs
+router.post('/sync-all-logs', async (req, res) => {
+  try {
+    const result = await apiService.getDeviceLogsAll();
+
+    if (result.success) {
+      return res.json({
+        success: true,
+        message: 'Successfully retrieved all device logs',
+        data: result.data,
+        rawData: result.rawData
+      });
+    } else {
+      return res.status(400).json({
+        success: false,
+        error: result.error || 'Failed to retrieve all device logs'
+      });
+    }
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 module.exports = router;

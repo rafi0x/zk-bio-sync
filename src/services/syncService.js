@@ -14,14 +14,12 @@ class SyncService {
 
   async initializeFromDb() {
     try {
-      console.log('[SyncService] Initializing from database...');
       // Load configuration from database
       const { config } = await dbService.getConfig();
-      console.log('[SyncService] Config:', config);
 
       // Always start the sync process during initialization
       const authInfo = await dbService.getAuthInfo();
-      console.log('[SyncService] Auth Info:', authInfo);
+      console.log("🚀 ~ SyncService ~ initializeFromDb ~ authInfo:", authInfo);
 
       if (authInfo && authInfo.username && authInfo.password) {
         // Start sync immediately

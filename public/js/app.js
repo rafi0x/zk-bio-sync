@@ -1,5 +1,4 @@
 document.addEventListener('DOMContentLoaded', () => {
-  console.log("DOM Content Loaded - Initializing Application");
 
   // Ensure API_BASE_URL is defined at the top of the file
   const API_BASE_URL = 'http://localhost:4000'; // Update this to match your backend server
@@ -25,6 +24,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const passwordInput = document.getElementById('password');
   const syncPeriodSelect = document.getElementById('sync-period');
   const serverUrlInput = document.getElementById('server-url');
+  const syncAllBtn = document.getElementById('sync-all-btn');
+  const syncAllText = document.getElementById('sync-all-text');
 
   // DOM Elements - Logs
   const logsContainer = document.getElementById('logs');
@@ -47,7 +48,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Detect if we're running in Electron
   const isElectron = window.api !== undefined;
-  console.log("Running in Electron:", isElectron);
 
   // Explicitly specify the backend URL for socket.io
   const SOCKET_IO_URL = 'http://localhost:4000'; // Update this to the correct backend URL if needed
@@ -57,7 +57,6 @@ document.addEventListener('DOMContentLoaded', () => {
   try {
     if (typeof io !== 'undefined') {
       socket = io(SOCKET_IO_URL); // Use the explicit backend URL
-      console.log("Socket.io initialized and connected to:", SOCKET_IO_URL);
 
       // Add event listeners for logs
       socket.on('log', handleLogEvent);
@@ -65,7 +64,6 @@ document.addEventListener('DOMContentLoaded', () => {
         console.error("Socket.io connection error:", error);
       });
     } else {
-      console.log("Socket.io not available, running in standalone mode");
     }
   } catch (error) {
     console.error("Failed to initialize socket.io:", error);
@@ -75,7 +73,6 @@ document.addEventListener('DOMContentLoaded', () => {
   // Tab Management - Add null checks and error handling
   if (dashboardTab) {
     dashboardTab.addEventListener('click', (e) => {
-      console.log("Dashboard tab clicked");
       e.preventDefault();
       switchTab('dashboard');
     });
@@ -83,7 +80,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (settingsTab) {
     settingsTab.addEventListener('click', (e) => {
-      console.log("Settings tab clicked");
       e.preventDefault();
       switchTab('settings');
     });
@@ -91,7 +87,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (devicesTab) {
     devicesTab.addEventListener('click', (e) => {
-      console.log("Devices tab clicked");
       e.preventDefault();
       switchTab('devices');
       loadDevices();
@@ -99,7 +94,6 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function switchTab(tabName) {
-    console.log(`Switching to tab: ${tabName}`);
     // Reset tab styling
     if (dashboardTab) {
       dashboardTab.classList.remove('text-red-400', 'border-b-2', 'border-red-500');
@@ -141,7 +135,6 @@ document.addEventListener('DOMContentLoaded', () => {
   // Event Listeners - Using a more robust approach
   if (toggleSyncBtn) {
     toggleSyncBtn.addEventListener('click', (e) => {
-      console.log("Toggle sync button clicked");
       e.preventDefault();
       toggleSync();
     });
@@ -149,15 +142,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (settingsForm) {
     settingsForm.addEventListener('submit', (e) => {
-      console.log("Settings form submitted");
       e.preventDefault();
       saveSettings(e);
     });
   }
 
+  if (syncAllBtn) {
+    syncAllBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      syncAllDeviceLogs();
+    });
+  }
+
   if (clearLogsBtn) {
     clearLogsBtn.addEventListener('click', (e) => {
-      console.log("Clear logs button clicked");
       e.preventDefault();
       clearLogs();
     });
@@ -165,7 +163,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (exportLogsBtn) {
     exportLogsBtn.addEventListener('click', (e) => {
-      console.log("Export logs button clicked");
       e.preventDefault();
       exportLogs();
     });
@@ -173,7 +170,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (refreshDevicesBtn) {
     refreshDevicesBtn.addEventListener('click', (e) => {
-      console.log("Refresh devices button clicked");
       e.preventDefault();
       loadDevices();
     });
@@ -181,7 +177,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (retryDevicesBtn) {
     retryDevicesBtn.addEventListener('click', (e) => {
-      console.log("Retry devices button clicked");
       e.preventDefault();
       loadDevices();
     });
@@ -194,9 +189,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Set up Electron IPC listeners if in Electron
   if (isElectron) {
-    console.log("Setting up Electron IPC listeners");
     window.api.receive('sync-status', (status) => {
-      console.log("Received sync status:", status);
       addLogEntry({
         timestamp: new Date().toISOString(),
         api: 'System',
@@ -205,7 +198,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     window.api.receive('sync-results', (results) => {
-      console.log("Received sync results:", results);
       if (Array.isArray(results)) {
         results.forEach(result => handleLogEvent(result));
       } else if (results) {
@@ -235,7 +227,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (settings.syncPeriod) {
           syncPeriodSelect.value = settings.syncPeriod;
         }
-        console.log("🚀 ~ initializeApplication ~ settings:", settings);
 
         // Check if settings are configured
         settingsConfigured = !!(settings.username && settings.password);
@@ -277,23 +268,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function fetchSettings() {
     try {
-      const configResponse = await fetch(`${API_BASE_URL}/api/settings/config`);
-      const configData = await configResponse.json();
-
-      const credentialsResponse = await fetch(`${API_BASE_URL}/api/settings/credentials`);
-      const credentialsData = await credentialsResponse.json();
-
-      console.log('Fetched config data:', configData);
-      console.log('Fetched credentials data:', credentialsData);
-
-      return {
-        username: credentialsData.username,
-        password: credentialsData.password, // Fetch password from the database
-        syncPeriod: configData.syncPeriod,
-        serverUrl: configData.serverUrl, // Fetch serverUrl from the database
-        hasCredentials: !!(credentialsData.username && credentialsData.password),
-        lastLogin: credentialsData.lastLogin
-      };
+      if (isElectron) {
+        return new Promise((resolve, reject) => {
+          window.api.receive('settings', (settings) => {
+            if (settings.success !== false) {
+              resolve(settings);
+            } else {
+              console.error("Error fetching settings via IPC:", settings.error);
+              reject(new Error(settings.error || 'Failed to fetch settings'));
+            }
+          });
+          window.api.send('get-settings');
+        });
+      } else {
+        const configResponse = await fetch(`${API_BASE_URL}/api/settings/config`);
+        return await configResponse.json();
+      }
     } catch (error) {
       console.error('Error fetching settings:', error);
       return null;
@@ -318,7 +308,6 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   async function toggleSync() {
-    console.log('Toggle Sync clicked. Settings configured:', settingsConfigured);
 
     if (!settingsConfigured) {
       addLogEntry({
@@ -341,6 +330,7 @@ document.addEventListener('DOMContentLoaded', () => {
   async function startSync() {
     try {
       const settings = await fetchSettings();
+      console.log("🚀 ~ startSync ~ settings:", settings);
 
       const response = await fetch(`${API_BASE_URL}/api/sync/start`, {
         method: 'POST',
@@ -495,6 +485,67 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  async function syncAllDeviceLogs() {
+    // Update button state to show loading
+    syncAllBtn.disabled = true;
+    syncAllText.textContent = 'Syncing All Logs...';
+
+    try {
+      if (isElectron) {
+        // For Electron, we need to call the API service through the backend
+        const response = await fetch(`${API_BASE_URL}/api/sync-all-logs`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.success) {
+          addLogEntry({
+            timestamp: new Date().toISOString(),
+            api: 'System',
+            message: `Successfully synced all device logs. Retrieved ${data.data?.length || 0} records.`,
+          });
+        } else {
+          throw new Error(data.error || 'Failed to sync all device logs');
+        }
+      } else {
+        // For web version, make direct API call
+        const response = await fetch(`${API_BASE_URL}/api/sync-all-logs`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.success) {
+          addLogEntry({
+            timestamp: new Date().toISOString(),
+            api: 'System',
+            message: `Successfully synced all device logs. Retrieved ${data.data?.length || 0} records.`,
+          });
+        } else {
+          throw new Error(data.error || 'Failed to sync all device logs');
+        }
+      }
+    } catch (error) {
+      addLogEntry({
+        timestamp: new Date().toISOString(),
+        api: 'System',
+        success: false,
+        error: `Error syncing all device logs: ${error.message}`,
+      });
+    } finally {
+      // Reset button state
+      syncAllBtn.disabled = false;
+      syncAllText.textContent = 'Sync All Device Logs';
+    }
+  }
+
   function updateSyncUI(isActive) {
     if (isActive) {
       // Update button
@@ -572,7 +623,6 @@ document.addEventListener('DOMContentLoaded', () => {
         return new Promise((resolve) => {
           // Set up listener for sync status result
           window.api.receive('sync-status-result', (result) => {
-            console.log("Received sync status for countdown:", result);
 
             // Get values for the countdown
             lastSyncTime = new Date(result.lastSyncTime || new Date());
@@ -737,7 +787,6 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function renderDevicesTable(devices) {
-    console.log("🚀 ~ renderDevicesTable ~ devices:", devices);
     // Clear existing rows
     devicesTableBody.innerHTML = '';
 
@@ -795,32 +844,42 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function saveCompanyId(deviceId, companyId) {
     try {
-      const response = await fetch(`/api/devices/${deviceId}/company`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ companyId }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
-        addLogEntry({
-          timestamp: new Date().toISOString(),
-          api: 'Devices',
-          message: `Company ID for device ${deviceId} updated to "${companyId}"`,
+      if (isElectron) {
+        return new Promise((resolve, reject) => {
+          window.api.receive('update-device-company-result', (result) => {
+            if (result.success) {
+              addLogEntry({
+                timestamp: new Date().toISOString(),
+                api: 'Devices',
+                message: `Company ID for device ${deviceId} updated to "${companyId}"`,
+              });
+              resolve(result);
+            } else {
+              reject(new Error(result.error || 'Failed to update company ID'));
+            }
+          });
+          window.api.send('update-device-company', { deviceId, companyId });
+        });
+      } else {
+        const response = await fetch(`/api/devices/${deviceId}/company`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ companyId }),
         });
 
-        // Highlight the input briefly
-        const input = document.querySelector(`input[data-device-id="${deviceId}"]`);
-        input.classList.add('bg-green-900');
-        setTimeout(() => {
-          input.classList.remove('bg-green-900');
-        }, 500);
+        const data = await response.json();
 
-      } else {
-        throw new Error(data.error || 'Failed to update company ID');
+        if (response.ok && data.success) {
+          addLogEntry({
+            timestamp: new Date().toISOString(),
+            api: 'Devices',
+            message: `Company ID for device ${deviceId} updated to "${companyId}"`,
+          });
+        } else {
+          throw new Error(data.error || 'Failed to update company ID');
+        }
       }
     } catch (error) {
       console.error('Error saving company ID:', error);
