@@ -209,9 +209,28 @@ class DbService {
 
   async saveDevices(devices) {
     await this.init();
-    db.data.devices = devices;
+
+    // Get existing devices
+    const existingDevices = db.data.devices || [];
+
+    // Create a map of existing devices by IP for quick lookup
+    const existingDevicesByIp = new Map();
+    existingDevices.forEach(device => {
+      if (device.ip) {
+        existingDevicesByIp.set(device.ip, device);
+      }
+    });
+
+    // Add only new devices that don't exist based on IP
+    devices.forEach(newDevice => {
+      if (newDevice.ip && !existingDevicesByIp.has(newDevice.ip)) {
+        existingDevices.push(newDevice);
+      }
+    });
+
+    db.data.devices = existingDevices;
     await this.saveData();
-    return devices;
+    return existingDevices;
   }
 
   async updateDeviceCompanyId(deviceId, companyId) {
@@ -221,7 +240,7 @@ class DbService {
     const deviceIdStr = String(deviceId);
 
     // Find device by string comparison
-    const deviceIndex = db.data.devices.findIndex(d => String(d.id) === deviceIdStr);
+    const deviceIndex = db.data.devices.findIndex(d => String(d.id) == deviceIdStr);
 
     if (deviceIndex >= 0) {
       // Update existing device
